@@ -1,4 +1,6 @@
-use std::ffi::{CStr, CString};
+#![warn(clippy::pedantic)]
+
+use std::ffi::{CStr, CString, NulError};
 use std::os::raw::c_char;
 
 #[repr(C)]
@@ -15,9 +17,17 @@ unsafe extern "C" {
     ) -> MetaphoneResult;
     pub fn FreeMetaphoneResult(result: MetaphoneResult);
 }
-
-pub fn metaphone3(word: &str, encode_vowels: bool, encode_exact: bool) -> (String, String) {
-    let c_word = CString::new(word).expect("CString::new failed");
+/// Encode a word into a pair of Metaphone3 encodings
+///
+/// # Errors
+///
+/// Will return `NulError` if `word` contains a NUL-byte.
+pub fn metaphone3(
+    word: &str,
+    encode_vowels: bool,
+    encode_exact: bool,
+) -> Result<(String, String), NulError> {
+    let c_word = CString::new(word)?;
     unsafe {
         let result = EncodeMetaphone(c_word.as_ptr(), encode_vowels, encode_exact);
 
@@ -30,7 +40,7 @@ pub fn metaphone3(word: &str, encode_vowels: bool, encode_exact: bool) -> (Strin
 
         FreeMetaphoneResult(result);
 
-        (primary, secondary)
+        Ok((primary, secondary))
     }
 }
 #[cfg(test)]
@@ -41,19 +51,19 @@ mod tests {
     fn it_works() {
         assert_eq!(
             ("SM0".into(), "XMT".into()),
-            metaphone3("SMITH", false, false)
+            metaphone3("SMITH", false, false).unwrap()
         );
         assert_eq!(
             ("SMA0".into(), "XMAT".into()),
-            metaphone3("SMITH", true, false)
+            metaphone3("SMITH", true, false).unwrap()
         );
         assert_eq!(
             ("KAPLAN".into(), "".into()),
-            metaphone3("GOBLIN", true, false)
+            metaphone3("GOBLIN", true, false).unwrap()
         );
         assert_eq!(
             ("GABLAN".into(), "".into()),
-            metaphone3("GOBLIN", true, true)
+            metaphone3("GOBLIN", true, true).unwrap()
         );
     }
 }

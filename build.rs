@@ -32,7 +32,7 @@ fn main() {
         .expect("Failed to execute Go build");
 
     if !status.success() {
-        panic!("Go build failed with status: {}", status);
+        panic!("Go build failed with status: {status}");
     }
 
     // Линкуем
