@@ -1,4 +1,4 @@
-use untitled11::Metaphone3;
+use metaphone3::Metaphone3;
 
 // --- Main function for demonstration ---
 fn main() {
