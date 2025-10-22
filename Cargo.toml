@@ -1,11 +1,9 @@
 [package]
-name = "metaphone3-sys"
-version = "0.3.0"
+name = "metaphone3"
+version = "0.1.0"
 edition = "2024"
-license = "MIT"
-description = "Bindings for the Metaphone3 Go library"
-repository = "https://github.com/kakserpom/metaphone3-rs"
-include = ["/lib", "/src", "build.rs"]
 
-[target.'cfg(windows)'.dependencies]
-libloading = "0.8.8"
+[dependencies]
+smartstring = "1.0.1"
+[dev-dependencies]
+csv = "1.4.0"
