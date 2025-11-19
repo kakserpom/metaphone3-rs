@@ -23,7 +23,7 @@ To use the `metaphone3-sys` crate, add it as a dependency in your `Cargo.toml` f
 
 ```toml
 [dependencies]
-metaphone3-sys = "0.1"
+metaphone3-sys = "0.3"
 ```
 
 ### Functions
