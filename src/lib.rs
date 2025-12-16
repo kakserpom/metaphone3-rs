@@ -107,7 +107,7 @@ impl Metaphone3 {
                 }
             }
 
-            // Always increment idx by 1 to match Go's for loop behavior (e.idx++)
+            // Always increment idx to match Go's for loop behavior (e.idx++)
             // This happens regardless of whether the encoder modified idx
             self.idx += 1;
         }
@@ -348,7 +348,7 @@ impl Metaphone3 {
     fn encode_english_ch_to_k(&mut self) -> bool {
         //'ache', 'echo', alternate spelling of 'michael'
         if (self.idx == 1 && self.root_or_inflections("ACHE"))
-            || ((self.idx > 3 && self.root_or_inflections("ACHE"))
+            || ((self.idx > 3 && self.idx > 0 && self.root_or_inflections_from(self.idx - 1, "ACHE"))
                 && self.string_start(&[
                     "EAR", "HEAD", "BACK", "HEART", "BELLY", "TOOTH",
                 ]))
@@ -816,7 +816,7 @@ impl Metaphone3 {
         } else {
             self.metaph_add('T');
         }
-        self.idx += 1;
+        // Don't increment idx - let main loop handle it
     }
 
     fn encode_dg(&mut self) -> bool {
@@ -832,7 +832,7 @@ impl Metaphone3 {
                 self.metaph_add('J');
             }
 
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
 
@@ -843,7 +843,7 @@ impl Metaphone3 {
         // e.g. "adjacent"
         if self.string_at(0, &["DJ"]) {
             self.metaph_add('J');
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
         false
@@ -854,7 +854,7 @@ impl Metaphone3 {
         if self.string_at(0, &["DT", "DD"]) {
             if self.string_at(0, &["DTH"]) {
                 self.metaph_add_exact_approx_alt("D0", "D0", "T0", "T0");
-                self.idx += 3;
+                self.idx += 2;
             } else {
                 if self.encode_exact {
                     // devoice it
@@ -866,7 +866,7 @@ impl Metaphone3 {
                 } else {
                     self.metaph_add('T');
                 }
-                self.idx += 2;
+                self.idx += 1;
             }
 
             return true;
@@ -884,7 +884,7 @@ impl Metaphone3 {
             self.string_at(-1, &["ADUA", "IDUA", "IDUU", "NDULA", "NDULU", "EDUCA"]) {
 
             self.metaph_add_exact_approx_alt("J", "D", "J", "T");
-            self.advance_counter(2, 1);
+            self.advance_counter(1, 0);
             return true;
         }
         false
@@ -894,7 +894,7 @@ impl Metaphone3 {
         // e.g. "assiduous", "arduous"
         if self.string_at(1, &["UOUS"]) {
             self.metaph_add_exact_approx_alt("J", "D", "J", "T");
-            self.advance_counter(4, 1);
+            self.advance_counter(3, 0);
             return true;
         }
         false
@@ -902,14 +902,10 @@ impl Metaphone3 {
 
     fn encode_silent_d(&mut self) -> bool {
         // silent 'D' e.g. 'wednesday', 'handsome'
-        if self.string_at(-2, &["WEDNESDAY"]) ||
+        self.string_at(-2, &["WEDNESDAY"]) ||
             self.string_at(-3, &["HANDKER", "HANDSOM", "WINDSOR"]) ||
             // french silent D at end in words or names familiar to americans
-            self.string_end(&["PERNOD", "ARTAUD", "RENAUD", "RIMBAUD", "MICHAUD", "BICHAUD"]) {
-            self.idx += 1;
-            return true;
-        }
-        false
+            self.string_end(&["PERNOD", "ARTAUD", "RENAUD", "RIMBAUD", "MICHAUD", "BICHAUD"])
     }
 
     fn encode_f(&mut self) {
@@ -940,7 +936,6 @@ impl Metaphone3 {
         if !self.string_at(-1, &["C", "K", "G", "Q"]) {
             self.metaph_add_exact_approx('G', 'K');
         }
-        self.idx += 1;
     }
 
     fn encode_silent_g_at_beginning(&mut self) -> bool {
@@ -977,7 +972,7 @@ impl Metaphone3 {
         // 'gingko'
         if self.char_next_is('K') {
             self.metaph_add('K');
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
         false
@@ -993,7 +988,7 @@ impl Metaphone3 {
             }
 
             self.metaph_add_exact_approx('G', 'K');
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
         false
@@ -1005,7 +1000,7 @@ impl Metaphone3 {
             // not e.g. 'greenhalgh'
             !self.string_at_end(-3, &["HALGH"]) {
             self.metaph_add_exact_approx('G', 'K');
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
         false
@@ -1019,7 +1014,7 @@ impl Metaphone3 {
             } else {
                 self.metaph_add_exact_approx('G', 'K');
             }
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
         false
@@ -1029,7 +1024,7 @@ impl Metaphone3 {
         // e.g., 'greenhalgh', 'dunkenhalgh', english names
         if self.string_at_end(-2, &["ALGH"]) {
             self.metaph_add_alt('J', '\0');
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
         false
@@ -1041,7 +1036,7 @@ impl Metaphone3 {
         if (self.string_at(-4, &["DONO", "DONA"]) && self.is_vowel_at(2)) ||
             self.string_at(-5, &["CALLAGHAN"]) {
             self.metaph_add('H');
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
         false
@@ -1059,7 +1054,7 @@ impl Metaphone3 {
                 self.metaph_add('T');
             }
 
-            self.idx += 3;
+            self.idx += 2;
             return true;
         }
         false
@@ -1069,7 +1064,7 @@ impl Metaphone3 {
         // if the 'H' is the beginning of another word or syllable
         if self.string_at(1, &["HOUS", "HEAD", "HOLE", "HORN", "HARN"]) {
             self.metaph_add_exact_approx('G', 'K');
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
         false
@@ -1103,7 +1098,7 @@ impl Metaphone3 {
             !(self.string_start(&["BALOGH", "SABAGH"]) || self.string_at(-2, &["BAGHDAD"]) ||
                 self.string_at(-3, &["WHIGH"]) || self.string_at(-5, &["SABBAGH", "AKHLAGH"])) {
             // silent - do nothing
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
         false
@@ -1134,7 +1129,7 @@ impl Metaphone3 {
         }
 
         if handled {
-            self.idx += 2;
+            self.idx += 1;
         }
 
         handled
@@ -1153,7 +1148,7 @@ impl Metaphone3 {
             !self.string_at(-4, &["BREUGHEL", "FLAUGHER"]) {
 
             self.metaph_add('F');
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
         false
@@ -1202,7 +1197,7 @@ impl Metaphone3 {
             } else {
                 self.metaph_add_exact_approx_str("GN", "KN");
             }
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
 
@@ -1214,7 +1209,7 @@ impl Metaphone3 {
         // since americans sometimes do this
         if self.string_at(1, &["LIA", "LIO", "LIE"]) && self.is_vowel_at(-1) {
             self.metaph_add_exact_approx_alt("L", "GL", "L", "KL");
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
         false
@@ -1514,9 +1509,7 @@ impl Metaphone3 {
         }
 
         // only keep if first & before vowel or btw. 2 vowels
-        if !self.encode_h_pronounced() {
-            self.idx += 1;
-        }
+        self.encode_h_pronounced();
     }
 
     fn encode_initial_silent_h(&mut self) -> bool {
@@ -1534,13 +1527,8 @@ impl Metaphone3 {
                 self.metaph_add('A');
             }
 
-            // don't encode vowels twice - skip them
-            // TODO: Fix skip_vowels and uncomment
-            // self.idx = self.skip_vowels(self.idx + 1);
-            self.idx += 1;
-            while self.idx < self.length && Self::is_vowel_char(self.in_buf[self.idx]) {
-                self.idx += 1;
-            }
+            // don't encode vowels twice
+            self.idx = self.skip_vowels(self.idx + 1);
             return true;
         }
 
@@ -1551,7 +1539,7 @@ impl Metaphone3 {
         // old chinese pinyin transliteration e.g., 'HSIAO'
         if self.string_at_start(0, &["HS"]) {
             self.metaph_add('X');
-            self.idx += 2;
+            self.idx += 1;
             return true;
         }
         false
@@ -1570,6 +1558,7 @@ impl Metaphone3 {
                 while self.idx < self.length && (Self::is_vowel_char(self.in_buf[self.idx]) || self.in_buf[self.idx] == 'W') {
                     self.idx += 1;
                 }
+                self.idx -= 1; // give back one that's going to be added in the main loop
             }
             return true;
         }
@@ -1584,12 +1573,7 @@ impl Metaphone3 {
             if self.encode_vowels {
                 self.idx += 1;
             } else {
-                // TODO: Fix skip_vowels
-                // self.idx = self.skip_vowels(self.idx + 1);
-                self.idx += 1;
-                while self.idx < self.length && Self::is_vowel_char(self.in_buf[self.idx]) {
-                    self.idx += 1;
-                }
+                self.idx = self.skip_vowels(self.idx + 1);
             }
             return true;
         }
@@ -1603,7 +1587,7 @@ impl Metaphone3 {
             (self.char_next_is('H') && self.is_vowel_at(2)) {
 
             self.metaph_add('H');
-            self.advance_counter(2, 1);
+            self.advance_counter(1, 0);
             return true;
         }
 
@@ -1633,7 +1617,6 @@ impl Metaphone3 {
                 self.idx += 1;
             }
         }
-        self.idx += 1;
     }
 
     fn encode_spanish_j(&mut self) -> bool {
@@ -1661,7 +1644,7 @@ impl Metaphone3 {
             } else if self.idx == 0 {
                 self.metaph_add('A');
             }
-            self.advance_counter(2, 1);
+            self.advance_counter(1, 0);
             return true;
         }
 
@@ -1673,11 +1656,11 @@ impl Metaphone3 {
                 } else {
                     self.metaph_add_str("JRJ", "HRH");
                 }
-                self.advance_counter(5, 5);
+                self.advance_counter(4, 4);
                 return true;
             }
             self.metaph_add_alt('J', 'H');
-            self.advance_counter(2, 1);
+            self.advance_counter(1, 0);
             return true;
         }
 
@@ -1688,7 +1671,7 @@ impl Metaphone3 {
         if self.string_at(1, &["AH", "UGO"]) || self.string_exact(&["JOHANN"]) ||
             (self.string_at(1, &["UNG"]) && !self.char_at(4, 'L')) {
             self.metaph_add('A');
-            self.advance_counter(2, 1);
+            self.advance_counter(1, 0);
             return true;
         }
         false
@@ -1701,7 +1684,7 @@ impl Metaphone3 {
             } else {
                 self.metaph_add_str("HH", "HH");
             }
-            self.advance_counter(4, 3);
+            self.advance_counter(3, 2);
             return true;
         }
         false
@@ -1710,6 +1693,7 @@ impl Metaphone3 {
     fn encode_j_to_j(&mut self) -> bool {
         if self.is_vowel_at(1) {
             if self.idx == 0 && self.names_beginning_with_j_that_get_alt_y() {
+                // 'Y' is a vowel so encode is as 'A'
                 if self.encode_vowels {
                     self.metaph_add_str("JA", "A");
                 } else {
@@ -1722,12 +1706,7 @@ impl Metaphone3 {
                     self.metaph_add('J');
                 }
             }
-            // TODO: Fix skip_vowels
-            // self.idx = self.skip_vowels(self.idx + 1);
-            self.idx += 1;
-            while self.idx < self.length && Self::is_vowel_char(self.in_buf[self.idx]) {
-                self.idx += 1;
-            }
+            self.idx = self.skip_vowels(self.idx + 1);
             return false;
         }
 
@@ -1742,7 +1721,7 @@ impl Metaphone3 {
             self.string_at_end(-1, &["AJOS", "EJOS", "OJAS", "OJOS", "UJON", "AJOZ", "AJAL", "UJAR", "EJON", "EJAN", "AJARA"]) ||
             (self.string_at_end(-1, &["OJA", "EJA"]) && !self.string_start(&["DEJA"])) {
             self.metaph_add('H');
-            self.advance_counter(2, 1);
+            self.advance_counter(1, 0);
             return true;
         }
         false
@@ -1750,7 +1729,7 @@ impl Metaphone3 {
 
     fn encode_j_as_vowel(&mut self) -> bool {
         if self.string_at(0, &["JEWSK"]) {
-            self.metaph_add('J');  // Note: Go uses ReplacementChar for alt, simplified here
+            self.metaph_add_alt('J', '\0');  // J in primary only, nothing in secondary
             return true;
         }
 
@@ -1813,7 +1792,7 @@ impl Metaphone3 {
                 self.idx += 1;
             }
         }
-        self.idx += 1;  // Always increment
+        // Don't increment idx - let main loop handle it
     }
 
     fn encode_silent_k(&mut self) -> bool {
@@ -3336,7 +3315,6 @@ impl Metaphone3 {
             self.idx += 1;
         }
         self.metaph_add_exact_approx('V', 'F');
-        self.idx += 1;
     }
 
     fn encode_w(&mut self) {
@@ -4095,13 +4073,13 @@ impl Metaphone3 {
 
     /// Adds different encoding characters to primary and secondary buffers
     fn metaph_add_alt(&mut self, prim: char, second: char) {
-        // Add to primary buffer (don't duplicate A's)
-        if !(prim == 'A' && !self.prim_buf.is_empty() && self.prim_buf[self.prim_buf.len() - 1] == 'A') {
+        // Add to primary buffer if not null (don't duplicate A's)
+        if prim != '\0' && !(prim == 'A' && !self.prim_buf.is_empty() && self.prim_buf[self.prim_buf.len() - 1] == 'A') {
             self.prim_buf.push(prim);
         }
 
-        // Add to secondary buffer (don't duplicate A's)
-        if !(second == 'A' && !self.second_buf.is_empty() && self.second_buf[self.second_buf.len() - 1] == 'A') {
+        // Add to secondary buffer if not null (don't duplicate A's)
+        if second != '\0' && !(second == 'A' && !self.second_buf.is_empty() && self.second_buf[self.second_buf.len() - 1] == 'A') {
             self.second_buf.push(second);
         }
     }
@@ -4219,8 +4197,19 @@ impl Metaphone3 {
 
     /// Check if the input word is the root itself or a common inflection of the root
     fn root_or_inflections(&self, root: &str) -> bool {
+        Self::root_or_inflections_slice(&self.in_buf, root)
+    }
+
+    fn root_or_inflections_from(&self, from: usize, root: &str) -> bool {
+        if from >= self.in_buf.len() {
+            return false;
+        }
+        Self::root_or_inflections_slice(&self.in_buf[from..], root)
+    }
+
+    fn root_or_inflections_slice(in_word: &[char], root: &str) -> bool {
         let root_chars: Vec<char> = root.chars().collect();
-        let len_diff = self.in_buf.len() as isize - root_chars.len() as isize;
+        let len_diff = in_word.len() as isize - root_chars.len() as isize;
 
         // there's no alternate shorter than the root itself
         if len_diff < 0 {
@@ -4230,12 +4219,12 @@ impl Metaphone3 {
         // inWord must start with all the letters of root except the last
         let last = root_chars.len() - 1;
         for i in 0..last {
-            if self.in_buf[i] != root_chars[i] {
+            if in_word[i] != root_chars[i] {
                 return false;
             }
         }
 
-        let in_word = &self.in_buf[last..];
+        let in_word = &in_word[last..];
         // at this point we know they start the same way
         // except the last rune of root that we didn't check, so check that now
         // check our last letter and simple plural

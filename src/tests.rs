@@ -2,8 +2,6 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-// Предполагается, что ваш модуль называется `metaphone3`
-// и содержит структуру `Metaphone3`
 use crate::Metaphone3;
 
 #[test]
