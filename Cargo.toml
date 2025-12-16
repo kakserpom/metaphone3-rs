@@ -1,7 +1,11 @@
 [package]
 name = "metaphone3"
-version = "0.2.0"
+version = "0.1.0"
 edition = "2024"
+license = "BSD-3"
+description = "Bindings for the Metaphone3 Go library"
+repository = "https://github.com/kakserpom/metaphone3-rs"
+include = ["/lib", "/src", "build.rs"]
 
 [dependencies]
 smartstring = "1.0.1"
