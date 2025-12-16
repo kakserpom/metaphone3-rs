@@ -173,7 +173,7 @@ The `Metaphone3` encoder is **not** thread-safe. Each thread should use its own 
 
 ## License
 
-BSD 3-Clause License. See [LICENSE](metaphone3/LICENSE) for details.
+MIT
 
 ## Contributing
 

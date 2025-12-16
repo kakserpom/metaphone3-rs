@@ -2,7 +2,7 @@
 name = "metaphone3"
 version = "0.1.0"
 edition = "2024"
-license = "BSD-3"
+license = "MIT"
 description = "Metaphone3 phonetic algorithm"
 repository = "https://github.com/kakserpom/metaphone3-rs"
 
