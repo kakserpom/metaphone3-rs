@@ -1,5 +1,9 @@
 # metaphone3
 
+[![CI](https://github.com/kakserpom/metaphone3-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/kakserpom/metaphone3-rs/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/metaphone3.svg)](https://crates.io/crates/metaphone3)
+[![docs.rs](https://docs.rs/metaphone3/badge.svg)](https://docs.rs/metaphone3)
+
 A pure Rust implementation of the Metaphone 3 phonetic encoding algorithm.
 
 Metaphone 3 is a more accurate version of the original Soundex algorithm, designed so that similar-sounding words in American English share the same keys. This makes it useful for fuzzy matching, searching names, and comparing words phonetically.
