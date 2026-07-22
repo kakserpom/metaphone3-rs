@@ -27,15 +27,16 @@
 #![warn(clippy::pedantic)]
 // These pedantic lints are intentionally allowed: the algorithm is a faithful
 // port whose index arithmetic relies on `usize`/`isize` casts that are correct
-// by construction (indices stay within short words), and whose boolean
-// conditionals and short binding names deliberately mirror the reference
-// implementation for auditability.
+// by construction (indices stay within short words), whose boolean conditionals
+// and short binding names deliberately mirror the reference implementation for
+// auditability, and whose per-letter encoding routines are long by nature.
 #![allow(
     clippy::cast_possible_wrap,
     clippy::cast_sign_loss,
     clippy::similar_names,
     clippy::nonminimal_bool,
-    clippy::if_not_else
+    clippy::if_not_else,
+    clippy::too_many_lines
 )]
 
 #[cfg(test)]
@@ -121,7 +122,8 @@ impl Metaphone3 {
         // Uppercase char-by-char, reusing the existing buffer's capacity to avoid
         // allocating a temporary String plus a fresh Vec on every call.
         self.in_buf.clear();
-        self.in_buf.extend(word.chars().flat_map(char::to_uppercase));
+        self.in_buf
+            .extend(word.chars().flat_map(char::to_uppercase));
         self.length = self.in_buf.len();
         self.last_idx = self.length - 1;
 
@@ -135,7 +137,9 @@ impl Metaphone3 {
         self.idx = 0;
         while self.idx < self.length {
             // Check if buffers are full
-            if self.prim_buf.len() >= METAPH_MAX_LENGTH && self.second_buf.len() >= METAPH_MAX_LENGTH {
+            if self.prim_buf.len() >= METAPH_MAX_LENGTH
+                && self.second_buf.len() >= METAPH_MAX_LENGTH
+            {
                 break;
             }
 
@@ -210,8 +214,11 @@ impl Metaphone3 {
         self.metaph_add_exact_approx('B', 'P');
 
         // skip double B, or BPx where X isn't H
-        if self.char_next_is('B') ||
-            (self.char_next_is('P') && self.idx + 2 < self.length && self.in_buf[self.idx + 2] != 'H') {
+        if self.char_next_is('B')
+            || (self.char_next_is('P')
+                && self.idx + 2 < self.length
+                && self.in_buf[self.idx + 2] != 'H')
+        {
             self.idx += 1;
         }
     }
@@ -274,7 +281,12 @@ impl Metaphone3 {
         // Also, where cedilla not used, as in "linguica" => LNKS
         if (self.idx == 0 && self.string_at(0, &["CAES", "CAEC", "CAEM"]))
             || self.string_start(&[
-                "FACADE", "FRANCAIS", "FRANCAIX", "LINGUICA", "GONCALVES", "PROVENCAL",
+                "FACADE",
+                "FRANCAIS",
+                "FRANCAIX",
+                "LINGUICA",
+                "GONCALVES",
+                "PROVENCAL",
             ])
         {
             self.metaph_add('S');
@@ -289,8 +301,7 @@ impl Metaphone3 {
     //including cases where the cedilla has not been used
     fn encode_co_to_s(&mut self) -> bool {
         // e.g. 'coelecanth' => SLKN0
-        if (self.string_at(0, &["COEL"])
-            && (self.is_vowel_at(4) || self.idx + 3 == self.last_idx))
+        if (self.string_at(0, &["COEL"]) && (self.is_vowel_at(4) || self.idx + 3 == self.last_idx))
             || self.string_at(0, &["COENA", "COENO"])
             || self.string_start(&["GARCON", "FRANCOIS", "MELANCON"])
         {
@@ -412,9 +423,7 @@ impl Metaphone3 {
         //'ache', 'echo', alternate spelling of 'michael'
         if (self.idx == 1 && self.root_or_inflections("ACHE"))
             || ((self.idx > 3 && self.root_or_inflections_from(self.idx - 1, "ACHE"))
-                && self.string_start(&[
-                    "EAR", "HEAD", "BACK", "HEART", "BELLY", "TOOTH",
-                ]))
+                && self.string_start(&["EAR", "HEAD", "BACK", "HEART", "BELLY", "TOOTH"]))
             || self.string_at(-1, &["ECHO"])
             || self.string_at(-2, &["MICHEAL"])
             || self.string_at(-4, &["JERICHO"])
@@ -495,13 +504,23 @@ impl Metaphone3 {
                 && (!self.root_or_inflections("ARCH")
                     && !self.string_at(-4, &["SEARCH", "POARCH"])
                     && !self.string_start(&[
-                        "ARCHER", "ARCHIE", "ARCHENEMY", "ARCHIBALD", "ARCHULETA", "ARCHAMBAU",
+                        "ARCHER",
+                        "ARCHIE",
+                        "ARCHENEMY",
+                        "ARCHIBALD",
+                        "ARCHULETA",
+                        "ARCHAMBAU",
                     ])
                     && !((((self.string_at(-3, &["LARCH", "MARCH", "PARCH"])
                         || self.string_at(-4, &["STARCH"]))
                         && !self.string_start(&[
-                            "EPARCH", "NOMARCH", "EXILARCH", "HIPPARCH", "MARCHESE",
-                            "ARISTARCH", "MARCHETTI",
+                            "EPARCH",
+                            "NOMARCH",
+                            "EXILARCH",
+                            "HIPPARCH",
+                            "MARCHESE",
+                            "ARISTARCH",
+                            "MARCHETTI",
                         ]))
                         || self.root_or_inflections("STARCH"))
                         && (!self.string_at(-2, &["ARCHU", "ARCHY"])
@@ -739,7 +758,8 @@ impl Metaphone3 {
             || self.string_at(1, &["ELLI", "ERTO", "EORL"]) // e.g. 'botticelli', 'concerto'
             || self.string_at_end(-3, &["CROCE"]) // some italian names familiar to americans
             || self.string_at(-3, &["DOLCE"])
-            || self.string_at_end(1, &["ELLO"]) // e.g. cello
+            || self.string_at_end(1, &["ELLO"])
+        // e.g. cello
         {
             self.metaph_add_alt('X', 'S');
             return true;
@@ -816,8 +836,7 @@ impl Metaphone3 {
     }
 
     fn encode_silent_c(&mut self) -> bool {
-        if self.string_at(1, &["T", "S"])
-            && self.string_start(&["INDICT", "TUCSON", "CONNECTICUT"])
+        if self.string_at(1, &["T", "S"]) && self.string_start(&["INDICT", "TUCSON", "CONNECTICUT"])
         {
             return true;
         }
@@ -863,8 +882,13 @@ impl Metaphone3 {
     }
 
     fn encode_d(&mut self) {
-        if self.encode_dg() || self.encode_dj() || self.encode_dt_dd() ||
-            self.encode_d_to_j() || self.encode_dous() || self.encode_silent_d() {
+        if self.encode_dg()
+            || self.encode_dj()
+            || self.encode_dt_dd()
+            || self.encode_d_to_j()
+            || self.encode_dous()
+            || self.encode_silent_d()
+        {
             return;
         }
 
@@ -886,9 +910,15 @@ impl Metaphone3 {
         if self.string_at(0, &["DG"]) {
             // excludes exceptions e.g. 'edgar',
             // or cases where 'g' is first letter of combining form
-            if self.string_at(2, &["A", "O"]) ||
-                self.string_at(1, &["GUN", "GUT", "GEAR", "GLAS", "GRIP", "GREN", "GILL", "GRAF",
-                                    "GUARD", "GUILT", "GRAVE", "GRASS", "GROUSE"]) {
+            if self.string_at(2, &["A", "O"])
+                || self.string_at(
+                    1,
+                    &[
+                        "GUN", "GUT", "GEAR", "GLAS", "GRIP", "GREN", "GILL", "GRAF", "GUARD",
+                        "GUILT", "GRAVE", "GRASS", "GROUSE",
+                    ],
+                )
+            {
                 self.metaph_add_exact_approx_alt("DG", "DG", "TK", "TK");
             } else {
                 // e.g. "edge", "abridgment"
@@ -944,8 +974,8 @@ impl Metaphone3 {
             self.string_at_end(-1, &["LDIER", "NDEUR", "EDURE", "RDURE"]) ||
             self.string_at(-3, &["CORDIAL"]) ||
             // e.g. "pendulum", "education"
-            self.string_at(-1, &["ADUA", "IDUA", "IDUU", "NDULA", "NDULU", "EDUCA"]) {
-
+            self.string_at(-1, &["ADUA", "IDUA", "IDUU", "NDULA", "NDULU", "EDUCA"])
+        {
             self.metaph_add_exact_approx_alt("J", "D", "J", "T");
             self.advance_counter(1, 0);
             return true;
@@ -989,10 +1019,20 @@ impl Metaphone3 {
     }
 
     fn encode_g(&mut self) {
-        if self.encode_silent_g_at_beginning() || self.encode_gg() || self.encode_gk() ||
-            self.encode_gh() || self.encode_silent_g() || self.encode_gn() || self.encode_gl() ||
-            self.encode_initial_g_front_vowel() || self.encode_nger() || self.encode_ger() ||
-            self.encode_gel() || self.encode_non_initial_g_front_vowel() || self.encode_ga_to_j() {
+        if self.encode_silent_g_at_beginning()
+            || self.encode_gg()
+            || self.encode_gk()
+            || self.encode_gh()
+            || self.encode_silent_g()
+            || self.encode_gn()
+            || self.encode_gl()
+            || self.encode_initial_g_front_vowel()
+            || self.encode_nger()
+            || self.encode_ger()
+            || self.encode_gel()
+            || self.encode_non_initial_g_front_vowel()
+            || self.encode_ga_to_j()
+        {
             return;
         }
 
@@ -1012,8 +1052,8 @@ impl Metaphone3 {
                 // 'ruggiero' but not 'snuggies'
                 (self.string_at(-1, &["UGGIE"]) && !(self.idx + 3 == self.last_idx || self.idx + 4 == self.last_idx)) ||
                 self.string_at_end(-1, &["AGGI", "OGGI"]) ||
-                self.string_at(-2, &["SUGGES", "XAGGER", "REGGIE"]) {
-
+                self.string_at(-2, &["SUGGES", "XAGGER", "REGGIE"])
+            {
                 // exception where "-GG-" => KJ
                 if self.string_at(-2, &["SUGGEST"]) {
                     self.metaph_add_exact_approx('G', 'K');
@@ -1043,10 +1083,15 @@ impl Metaphone3 {
 
     fn encode_gh(&mut self) -> bool {
         if self.char_next_is('H') {
-            if self.encode_gh_after_consonant() || self.encode_initial_gh() ||
-                self.encode_gh_to_j() || self.encode_gh_to_h() || self.encode_ught() ||
-                self.encode_gh_h_part_of_other_word() || self.encode_silent_gh() ||
-                self.encode_gh_to_f() {
+            if self.encode_gh_after_consonant()
+                || self.encode_initial_gh()
+                || self.encode_gh_to_j()
+                || self.encode_gh_to_h()
+                || self.encode_ught()
+                || self.encode_gh_h_part_of_other_word()
+                || self.encode_silent_gh()
+                || self.encode_gh_to_f()
+            {
                 return true;
             }
 
@@ -1061,7 +1106,8 @@ impl Metaphone3 {
         // e.g. 'burgher', 'bingham'
         if self.idx > 0 && !self.is_vowel_at(-1) &&
             // not e.g. 'greenhalgh'
-            !self.string_at_end(-3, &["HALGH"]) {
+            !self.string_at_end(-3, &["HALGH"])
+        {
             self.metaph_add_exact_approx('G', 'K');
             self.idx += 1;
             return true;
@@ -1096,8 +1142,9 @@ impl Metaphone3 {
     fn encode_gh_to_h(&mut self) -> bool {
         // special cases
         // e.g., 'donoghue', 'donaghy'
-        if (self.string_at(-4, &["DONO", "DONA"]) && self.is_vowel_at(2)) ||
-            self.string_at(-5, &["CALLAGHAN"]) {
+        if (self.string_at(-4, &["DONO", "DONA"]) && self.is_vowel_at(2))
+            || self.string_at(-5, &["CALLAGHAN"])
+        {
             self.metaph_add('H');
             self.idx += 1;
             return true;
@@ -1108,10 +1155,10 @@ impl Metaphone3 {
     fn encode_ught(&mut self) -> bool {
         // e.g. "ought", "aught", "daughter", "slaughter"
         if self.string_at(-1, &["UGHT"]) {
-            if (self.string_at(-3, &["LAUGH"]) &&
-                !(self.string_at(-4, &["SLAUGHT"]) || self.string_at(-3, &["LAUGHTO"]))) ||
-                self.string_at(-4, &["DRAUGH"]) {
-
+            if (self.string_at(-3, &["LAUGH"])
+                && !(self.string_at(-4, &["SLAUGHT"]) || self.string_at(-3, &["LAUGHTO"])))
+                || self.string_at(-4, &["DRAUGH"])
+            {
                 self.metaph_add_str("FT", "FT");
             } else {
                 self.metaph_add('T');
@@ -1159,7 +1206,8 @@ impl Metaphone3 {
                  self.string_at(-4, &["BROUGHAM"])))) &&
             // exceptions where '-g-' pronounced
             !(self.string_start(&["BALOGH", "SABAGH"]) || self.string_at(-2, &["BAGHDAD"]) ||
-                self.string_at(-3, &["WHIGH"]) || self.string_at(-5, &["SABBAGH", "AKHLAGH"])) {
+                self.string_at(-3, &["WHIGH"]) || self.string_at(-5, &["SABBAGH", "AKHLAGH"]))
+        {
             // silent - do nothing
             self.idx += 1;
             return true;
@@ -1206,10 +1254,12 @@ impl Metaphone3 {
         }
 
         // e.g., 'laugh', 'cough', 'rough', 'tough'
-        if self.idx > 2 && self.char_at(-1, 'U') && self.is_vowel_at(-2) &&
-            self.string_at(-3, &["C", "G", "L", "R", "T", "N", "S"]) &&
-            !self.string_at(-4, &["BREUGHEL", "FLAUGHER"]) {
-
+        if self.idx > 2
+            && self.char_at(-1, 'U')
+            && self.is_vowel_at(-2)
+            && self.string_at(-3, &["C", "G", "L", "R", "T", "N", "S"])
+            && !self.string_at(-4, &["BREUGHEL", "FLAUGHER"])
+        {
             self.metaph_add('F');
             self.idx += 1;
             return true;
@@ -1219,9 +1269,10 @@ impl Metaphone3 {
 
     fn encode_silent_g(&mut self) -> bool {
         // e.g. "phlegm", "apothegm", "voigt"
-        if self.string_at_end(-1, &["EGM", "IGM", "AGM"]) ||
-           self.string_at_end(0, &["GT"]) ||
-           self.string_exact(&["HUGES"]) {
+        if self.string_at_end(-1, &["EGM", "IGM", "AGM"])
+            || self.string_at_end(0, &["GT"])
+            || self.string_exact(&["HUGES"])
+        {
             return true;
         }
 
@@ -1255,7 +1306,8 @@ impl Metaphone3 {
                     !self.string_at(-2, &["SIGNET", "LIGNEO"]))) ||
                 // not e.g. 'cagney', 'magna'
                 (self.string_at_end(0, &["GNE", "GNA"]) &&
-                 !self.string_at(-2, &["SIGNA", "MAGNA", "SIGNE"])) {
+                 !self.string_at(-2, &["SIGNA", "MAGNA", "SIGNE"]))
+            {
                 self.metaph_add_exact_approx_alt("N", "GN", "N", "KN");
             } else {
                 self.metaph_add_exact_approx_str("GN", "KN");
@@ -1308,15 +1360,20 @@ impl Metaphone3 {
                 "IPPER", "ESELL", "IPSON", "EEZER", "ERSON", "ELMAN",
                 "ESTALT", "ESTAPO", "INGHAM", "ERRITY", "ERRISH", "ESSNER", "ENGLER",
                 "YNAECOL", "YNECOLO", "ENTHNER", "ERAGHTY",
-                "INGERICH", "EOGHEGAN"])) ||
-            (self.is_vowel_at(1) &&
-                (self.string_at(1, &["EE ", "EEW"]) ||
-                    (self.string_at(1, &["IGI", "IRA", "IBE", "AOL", "IDE", "IGL"]) &&
-                        !self.string_at(1, &["IDEON"])) ||
-                    self.string_at(1, &["ILES", "INGI", "ISEL", "IBBER", "IBBET", "IBLET", "IBRAN", "IGOLO", "IRARD", "IGANT",
-                        "IRAFFE", "EEWHIZ", "ILLETTE", "IBRALTA"]) ||
-                    (self.string_at(1, &["INGER"]) && !self.string_at(1, &["INGERICH"])))) {
-
+                "INGERICH", "EOGHEGAN"]))
+            || (self.is_vowel_at(1)
+                && (self.string_at(1, &["EE ", "EEW"])
+                    || (self.string_at(1, &["IGI", "IRA", "IBE", "AOL", "IDE", "IGL"])
+                        && !self.string_at(1, &["IDEON"]))
+                    || self.string_at(
+                        1,
+                        &[
+                            "ILES", "INGI", "ISEL", "IBBER", "IBBET", "IBLET", "IBRAN", "IGOLO",
+                            "IRARD", "IGANT", "IRAFFE", "EEWHIZ", "ILLETTE", "IBRALTA",
+                        ],
+                    )
+                    || (self.string_at(1, &["INGER"]) && !self.string_at(1, &["INGERICH"]))))
+        {
             return true;
         }
 
@@ -1335,24 +1392,32 @@ impl Metaphone3 {
             // 'ginger', 'passenger'
             // except for these the following
 
-            if !(self.root_or_inflections("ANGER") || self.root_or_inflections("LINGER") ||
-                self.root_or_inflections("MALINGER") || self.root_or_inflections("FINGER") ||
-                (self.string_at(-3, &["HUNG", "FING", "BUNG", "WING", "RING", "DING", "ZENG", "ZING",
+            if !(self.root_or_inflections("ANGER")
+                || self.root_or_inflections("LINGER")
+                || self.root_or_inflections("MALINGER")
+                || self.root_or_inflections("FINGER")
+                || (self.string_at(-3, &["HUNG", "FING", "BUNG", "WING", "RING", "DING", "ZENG", "ZING",
                     "JUNG", "LONG", "PING", "CONG", "MONG", "BANG", "GANG", "HANG", "LANG", "SANG", "SING",
                     "WANG", "ZANG"]) &&
                     // exceptions to above where 'G' => J
                     !(self.string_at(-6, &["BOULANG", "SLESING", "KISSING", "DERRING", "BARRING", "PHALANGER"]) ||
                         self.string_at(-8, &["SCHLESING"]) ||
                         self.string_at(-5, &["SALING", "BELANG"]) ||
-                        self.string_at(-4, &["CHANG"]))) ||
-                self.string_at(-4, &["STING", "YOUNG"]) || self.string_at(-5, &["STRONG"]) ||
-                self.string_start(&["UNG", "ENG", "ING", "SENGER"]) ||
-                self.string_at(0, &["GERICH"]) ||
-                self.string_at(-2, &["ANGERLY", "ANGERBO", "INGERSO"]) ||
-                self.string_at(-3, &["WENGER", "MUNGER", "SONGER", "KINGER", "LINGERF"]) ||
-                self.string_at(-4, &["FLINGER", "SLINGER", "STANGER", "STENGER", "KLINGER", "CLINGER"]) ||
-                self.string_at(-5, &["SPRINGER", "SPRENGER"])) {
-
+                        self.string_at(-4, &["CHANG"])))
+                || self.string_at(-4, &["STING", "YOUNG"])
+                || self.string_at(-5, &["STRONG"])
+                || self.string_start(&["UNG", "ENG", "ING", "SENGER"])
+                || self.string_at(0, &["GERICH"])
+                || self.string_at(-2, &["ANGERLY", "ANGERBO", "INGERSO"])
+                || self.string_at(-3, &["WENGER", "MUNGER", "SONGER", "KINGER", "LINGERF"])
+                || self.string_at(
+                    -4,
+                    &[
+                        "FLINGER", "SLINGER", "STANGER", "STENGER", "KLINGER", "CLINGER",
+                    ],
+                )
+                || self.string_at(-5, &["SPRINGER", "SPRENGER"]))
+            {
                 self.metaph_add_exact_approx_alt("J", "G", "J", "K");
             } else {
                 self.metaph_add_exact_approx_alt("G", "J", "K", "J");
@@ -1388,10 +1453,11 @@ impl Metaphone3 {
                 self.string_start(&["HARGER"]) ||
                 self.string_exact(&["AGER", "EGER"]) ||
                 self.string_at(-1, &["YGERNE"]) ||
-                self.string_at(-6, &["SCHWEIGER"])) &&
-                !(self.string_at(-5, &["BELLIGEREN"]) || self.string_start(&["MARGERY"]) ||
-                  self.string_at(-3, &["BERGERAC"])) {
-
+                self.string_at(-6, &["SCHWEIGER"]))
+                && !(self.string_at(-5, &["BELLIGEREN"])
+                    || self.string_start(&["MARGERY"])
+                    || self.string_at(-3, &["BERGERAC"]))
+            {
                 if self.is_slavo_germanic() {
                     self.metaph_add_exact_approx('G', 'K');
                 } else {
@@ -1417,8 +1483,8 @@ impl Metaphone3 {
                 // or the following as combining forms
                 self.string_at(-2, &["ENGEL", "HEGEL", "NAGEL", "VOGEL"]) ||
                 self.string_at(-3, &["MANGEL", "WEIGEL", "FLUGEL", "RANGEL", "HAUGEN", "RIEGEL", "VOEGEL"]) ||
-                self.string_at(-4, &["SPEIGEL", "STEIGEL", "WRANGEL", "SPIEGEL", "DANEGELD"]) {
-
+                self.string_at(-4, &["SPEIGEL", "STEIGEL", "WRANGEL", "SPIEGEL", "DANEGELD"])
+            {
                 if self.is_slavo_germanic() {
                     self.metaph_add_exact_approx('G', 'K');
                 } else {
@@ -1444,8 +1510,10 @@ impl Metaphone3 {
             // almost always 'j' sound
             if self.string_at_end(0, &["GE"]) {
                 // german names with hard g using GE at end
-                if self.string_start(&["INGE", "LAGE", "HAGE", "LANGE", "SYNGE", "BENGE", "RUNGE", "HELGE",
-                    "BYRGE", "BIRGE", "BERGE", "HAUGE", "RENEGE", "STONGE", "STANGE", "PRANGE", "KRESGE"]) {
+                if self.string_start(&[
+                    "INGE", "LAGE", "HAGE", "LANGE", "SYNGE", "BENGE", "RUNGE", "HELGE", "BYRGE",
+                    "BIRGE", "BERGE", "HAUGE", "RENEGE", "STONGE", "STANGE", "PRANGE", "KRESGE",
+                ]) {
                     if self.is_slavo_germanic() {
                         self.metaph_add_exact_approx('G', 'K');
                     } else {
@@ -1479,9 +1547,12 @@ impl Metaphone3 {
 
     fn internal_hard_g(&self) -> bool {
         // if not "-GE" at end
-        if !(self.idx + 1 == self.last_idx && self.char_next_is('E')) &&
-            (self.internal_hard_ng() || self.internal_hard_gen_gin_get_git() ||
-             self.internal_hard_g_open_syllable() || self.internal_hard_g_other()) {
+        if !(self.idx + 1 == self.last_idx && self.char_next_is('E'))
+            && (self.internal_hard_ng()
+                || self.internal_hard_gen_gin_get_git()
+                || self.internal_hard_g_open_syllable()
+                || self.internal_hard_g_other())
+        {
             return true;
         }
 
@@ -1489,17 +1560,18 @@ impl Metaphone3 {
     }
 
     fn internal_hard_ng(&self) -> bool {
-        if (self.string_at(-3, &["DANG", "FANG", "SING"]) && !self.string_at(-5, &["DISINGEN"])) ||
-            self.string_start(&["INGEB", "ENGEB"]) ||
-            (self.string_at(-3, &["RING", "WING", "HANG", "LONG"]) &&
-                !(self.string_at(-4, &["CRING", "FRING", "ORANG", "TWING", "CHANG", "PHANG"]) ||
+        if (self.string_at(-3, &["DANG", "FANG", "SING"]) && !self.string_at(-5, &["DISINGEN"]))
+            || self.string_start(&["INGEB", "ENGEB"])
+            || (self.string_at(-3, &["RING", "WING", "HANG", "LONG"])
+                && !(self.string_at(-4, &["CRING", "FRING", "ORANG", "TWING", "CHANG", "PHANG"]) ||
                     self.string_at(-5, &["SYRING"]) ||
                     self.string_at(-3, &["RINGENC", "RINGENT", "LONGITU", "LONGEVI"]) ||
                     // e.g. 'longino', 'mastrangelo'
-                    self.string_at_end(0, &["GELO", "GINO"]))) ||
-            (self.string_at(-1, &["NGY"]) &&
-                !(self.string_at(-3, &["RANGY", "MANGY", "MINGY"]) ||
-                    self.string_at(-4, &["SPONGY", "STINGY"]))) {
+                    self.string_at_end(0, &["GELO", "GINO"])))
+            || (self.string_at(-1, &["NGY"])
+                && !(self.string_at(-3, &["RANGY", "MANGY", "MINGY"])
+                    || self.string_at(-4, &["SPONGY", "STINGY"])))
+        {
             return true;
         }
 
@@ -1507,29 +1579,40 @@ impl Metaphone3 {
     }
 
     fn internal_hard_gen_gin_get_git(&self) -> bool {
-        if (self.string_at(-3, &["FORGET", "TARGET", "MARGIT", "MARGET", "TURGEN", "BERGEN", "MORGEN",
-            "JORGEN", "HAUGEN", "JERGEN", "JURGEN", "LINGEN", "BORGEN", "LANGEN", "KLAGEN", "STIGER", "BERGER"]) &&
-            !self.string_at(0, &["GENETIC", "GENESIS"]) && !self.string_at(-4, &["PLANGENT"])) ||
-            self.string_at_end(-3, &["BERGIN", "FEAGIN", "DURGIN"]) ||
-            (self.string_at(-2, &["ENGEN"]) && !self.string_at(3, &["DER", "ETI", "ESI"])) ||
-            self.string_at(-4, &["JUERGEN"]) ||
-            self.string_start(&["NAGIN", "MAGIN", "HAGIN"]) ||
-            self.string_exact(&["ENGIN", "DEGEN", "LAGEN", "MAGEN", "NAGIN"]) ||
-            (self.string_at(-2, &["BEGET", "BEGIN", "HAGEN", "FAGIN", "BOGEN", "WIGIN", "NTGEN", "EIGEN",
-                "WEGEN", "WAGEN"]) &&
-                !self.string_at(-5, &["OSPHAGEN"])) {
+        if (self.string_at(
+            -3,
+            &[
+                "FORGET", "TARGET", "MARGIT", "MARGET", "TURGEN", "BERGEN", "MORGEN", "JORGEN",
+                "HAUGEN", "JERGEN", "JURGEN", "LINGEN", "BORGEN", "LANGEN", "KLAGEN", "STIGER",
+                "BERGER",
+            ],
+        ) && !self.string_at(0, &["GENETIC", "GENESIS"])
+            && !self.string_at(-4, &["PLANGENT"]))
+            || self.string_at_end(-3, &["BERGIN", "FEAGIN", "DURGIN"])
+            || (self.string_at(-2, &["ENGEN"]) && !self.string_at(3, &["DER", "ETI", "ESI"]))
+            || self.string_at(-4, &["JUERGEN"])
+            || self.string_start(&["NAGIN", "MAGIN", "HAGIN"])
+            || self.string_exact(&["ENGIN", "DEGEN", "LAGEN", "MAGEN", "NAGIN"])
+            || (self.string_at(
+                -2,
+                &[
+                    "BEGET", "BEGIN", "HAGEN", "FAGIN", "BOGEN", "WIGIN", "NTGEN", "EIGEN",
+                    "WEGEN", "WAGEN",
+                ],
+            ) && !self.string_at(-5, &["OSPHAGEN"]))
+        {
             return true;
         }
         false
     }
 
     fn internal_hard_g_open_syllable(&self) -> bool {
-        self.string_at(1, &["EYE"]) ||
-            self.string_at(-2, &["FOGY", "POGY", "YOGI", "MAGEE", "MCGEE", "HAGIO"]) ||
-            self.string_at(-1, &["RGEY", "OGEY"]) ||
-            self.string_at(-3, &["HOAGY", "STOGY", "PORGY"]) ||
-            self.string_at(-5, &["CARNEGIE"]) ||
-            self.string_at_end(-1, &["OGEY", "OGIE"])
+        self.string_at(1, &["EYE"])
+            || self.string_at(-2, &["FOGY", "POGY", "YOGI", "MAGEE", "MCGEE", "HAGIO"])
+            || self.string_at(-1, &["RGEY", "OGEY"])
+            || self.string_at(-3, &["HOAGY", "STOGY", "PORGY"])
+            || self.string_at(-5, &["CARNEGIE"])
+            || self.string_at_end(-1, &["OGEY", "OGIE"])
     }
 
     fn internal_hard_g_other(&self) -> bool {
@@ -1544,8 +1627,8 @@ impl Metaphone3 {
             self.string_exact(&["ENGE", "BOGY"]) ||
             self.string_at(0, &["GIBBON"]) ||
             (self.string_at(0, &["GILL"]) && (self.idx + 3 == self.last_idx || self.idx + 4 == self.last_idx) &&
-             !self.string_start(&["STURGILL"])) {
-
+             !self.string_start(&["STURGILL"]))
+        {
             return true;
         }
 
@@ -1555,9 +1638,10 @@ impl Metaphone3 {
     fn encode_ga_to_j(&mut self) -> bool {
         // 'margary', 'margarine'
         // but not in spanish forms such as "margarita"
-        if (self.string_at(-3, &["MARGARY", "MARGARI"]) && !self.string_at(-3, &["MARGARIT"])) ||
-            self.string_start(&["GAOL"]) || self.string_at(-2, &["ALGAE"]) {
-
+        if (self.string_at(-3, &["MARGARY", "MARGARI"]) && !self.string_at(-3, &["MARGARIT"]))
+            || self.string_start(&["GAOL"])
+            || self.string_at(-2, &["ALGAE"])
+        {
             self.metaph_add_exact_approx_alt("J", "G", "J", "K");
             self.advance_counter(1, 0);
             return true;
@@ -1566,8 +1650,11 @@ impl Metaphone3 {
     }
 
     fn encode_h(&mut self) {
-        if self.encode_initial_silent_h() || self.encode_initial_hs() ||
-            self.encode_initial_hu_hw() || self.encode_non_initial_silent_h() {
+        if self.encode_initial_silent_h()
+            || self.encode_initial_hs()
+            || self.encode_initial_hu_hw()
+            || self.encode_non_initial_silent_h()
+        {
             return;
         }
 
@@ -1618,7 +1705,9 @@ impl Metaphone3 {
             } else {
                 self.idx += 1;
                 // don't encode vowels twice
-                while self.idx < self.length && (Self::is_vowel_char(self.in_buf[self.idx]) || self.in_buf[self.idx] == 'W') {
+                while self.idx < self.length
+                    && (Self::is_vowel_char(self.in_buf[self.idx]) || self.in_buf[self.idx] == 'W')
+                {
                     self.idx += 1;
                 }
                 self.idx -= 1; // give back one that's going to be added in the main loop
@@ -1630,9 +1719,16 @@ impl Metaphone3 {
     }
 
     fn encode_non_initial_silent_h(&mut self) -> bool {
-        if self.string_at(-2, &["NIHIL", "VEHEM", "LOHEN", "NEHEM", "MAHON", "MAHAN", "COHEN", "GAHAN"]) ||
-            self.string_at(-3, &["TOUHY", "GRAHAM", "PROHIB", "FRAHER", "TOOHEY", "TOUHEY"]) ||
-            self.string_start(&["CHIHUAHUA"]) {
+        if self.string_at(
+            -2,
+            &[
+                "NIHIL", "VEHEM", "LOHEN", "NEHEM", "MAHON", "MAHAN", "COHEN", "GAHAN",
+            ],
+        ) || self.string_at(
+            -3,
+            &["TOUHY", "GRAHAM", "PROHIB", "FRAHER", "TOOHEY", "TOUHEY"],
+        ) || self.string_start(&["CHIHUAHUA"])
+        {
             if self.encode_vowels {
                 self.idx += 1;
             } else {
@@ -1647,8 +1743,8 @@ impl Metaphone3 {
         if ((self.idx == 0 || self.is_vowel_at(-1) || (self.idx > 0 && self.char_at(-1, 'W'))) &&
             self.is_vowel_at(1)) ||
             // e.g. 'alWahhab'
-            (self.char_next_is('H') && self.is_vowel_at(2)) {
-
+            (self.char_next_is('H') && self.is_vowel_at(2))
+        {
             self.metaph_add('H');
             self.advance_counter(1, 0);
             return true;
@@ -1682,24 +1778,34 @@ impl Metaphone3 {
 
     fn encode_spanish_j(&mut self) -> bool {
         // Obvious spanish, e.g. "jose", "san jacinto"
-        if (self.string_at(1, &["UAN", "ACI", "ALI", "EFE", "ICA", "IME", "OAQ", "UAR"]) &&
-            !self.string_at(0, &["JIMERSON", "JIMERSEN"])) ||
-            self.string_at_end(1, &["OSE"]) ||
-            self.string_at(1, &["EREZ", "UNTA", "AIME", "AVIE", "AVIA", "IMINEZ", "ARAMIL"]) ||
-            self.string_at_end(-2, &["MEJIA"]) ||
-            self.string_at(-2, &["TEJED", "TEJAD", "LUJAN", "FAJAR", "BEJAR", "BOJOR", "CAJIG",
-                                  "DEJAS", "DUJAR", "DUJAN", "MIJAR", "MEJOR", "NAJAR",
-                                  "NOJOS", "RAJED", "RIJAL", "REJON", "TEJAN", "UIJAN"]) ||
-            self.string_at(-3, &["ALEJANDR", "GUAJARDO", "TRUJILLO"]) ||
-            (self.string_at(-2, &["RAJAS"]) && self.idx > 2) ||
-            (self.string_at(-2, &["MEJIA"]) && !self.string_at(-2, &["MEJIAN"])) ||
-            self.string_at(-1, &["OJEDA"]) ||
-            self.string_at(-3, &["LEIJA", "MINJA", "VIAJES", "GRAJAL"]) ||
-            self.string_at(0, &["JAUREGUI"]) ||
-            self.string_at(-4, &["HINOJOSA"]) ||
-            self.string_start(&["SAN "]) ||
-            ((self.idx + 1 == self.last_idx) && self.char_at(1, 'O') && !self.string_start(&["TOJO", "BANJO", "MARYJO"])) {
-
+        if (self.string_at(1, &["UAN", "ACI", "ALI", "EFE", "ICA", "IME", "OAQ", "UAR"])
+            && !self.string_at(0, &["JIMERSON", "JIMERSEN"]))
+            || self.string_at_end(1, &["OSE"])
+            || self.string_at(
+                1,
+                &["EREZ", "UNTA", "AIME", "AVIE", "AVIA", "IMINEZ", "ARAMIL"],
+            )
+            || self.string_at_end(-2, &["MEJIA"])
+            || self.string_at(
+                -2,
+                &[
+                    "TEJED", "TEJAD", "LUJAN", "FAJAR", "BEJAR", "BOJOR", "CAJIG", "DEJAS",
+                    "DUJAR", "DUJAN", "MIJAR", "MEJOR", "NAJAR", "NOJOS", "RAJED", "RIJAL",
+                    "REJON", "TEJAN", "UIJAN",
+                ],
+            )
+            || self.string_at(-3, &["ALEJANDR", "GUAJARDO", "TRUJILLO"])
+            || (self.string_at(-2, &["RAJAS"]) && self.idx > 2)
+            || (self.string_at(-2, &["MEJIA"]) && !self.string_at(-2, &["MEJIAN"]))
+            || self.string_at(-1, &["OJEDA"])
+            || self.string_at(-3, &["LEIJA", "MINJA", "VIAJES", "GRAJAL"])
+            || self.string_at(0, &["JAUREGUI"])
+            || self.string_at(-4, &["HINOJOSA"])
+            || self.string_start(&["SAN "])
+            || ((self.idx + 1 == self.last_idx)
+                && self.char_at(1, 'O')
+                && !self.string_start(&["TOJO", "BANJO", "MARYJO"]))
+        {
             if !(self.string_at(0, &["JUAN"]) || self.string_at(0, &["JOAQ"])) {
                 self.metaph_add('H');
             } else if self.idx == 0 {
@@ -1729,8 +1835,10 @@ impl Metaphone3 {
     }
 
     fn encode_german_j(&mut self) -> bool {
-        if self.string_at(1, &["AH", "UGO"]) || self.string_exact(&["JOHANN"]) ||
-            (self.string_at(1, &["UNG"]) && !self.char_at(4, 'L')) {
+        if self.string_at(1, &["AH", "UGO"])
+            || self.string_exact(&["JOHANN"])
+            || (self.string_at(1, &["UNG"]) && !self.char_at(4, 'L'))
+        {
             self.metaph_add('A');
             self.advance_counter(1, 0);
             return true;
@@ -1777,10 +1885,22 @@ impl Metaphone3 {
 
     fn encode_spanish_j2(&mut self) -> bool {
         // Spanish forms e.g. "brujo", "badajoz"
-        if self.string_at_start(-2, &["BOJA", "BAJA", "BEJA", "BOJO", "MOJA", "MOJI", "MEJI"]) ||
-            self.string_at_start(-3, &["FRIJO", "BRUJO", "BRUJA", "GRAJE", "GRIJA", "LEIJA", "QUIJA"]) ||
-            self.string_at_end(-1, &["AJOS", "EJOS", "OJAS", "OJOS", "UJON", "AJOZ", "AJAL", "UJAR", "EJON", "EJAN", "AJARA"]) ||
-            (self.string_at_end(-1, &["OJA", "EJA"]) && !self.string_start(&["DEJA"])) {
+        if self.string_at_start(
+            -2,
+            &["BOJA", "BAJA", "BEJA", "BOJO", "MOJA", "MOJI", "MEJI"],
+        ) || self.string_at_start(
+            -3,
+            &[
+                "FRIJO", "BRUJO", "BRUJA", "GRAJE", "GRIJA", "LEIJA", "QUIJA",
+            ],
+        ) || self.string_at_end(
+            -1,
+            &[
+                "AJOS", "EJOS", "OJAS", "OJOS", "UJON", "AJOZ", "AJAL", "UJAR", "EJON", "EJAN",
+                "AJARA",
+            ],
+        ) || (self.string_at_end(-1, &["OJA", "EJA"]) && !self.string_start(&["DEJA"]))
+        {
             self.metaph_add('H');
             self.advance_counter(1, 0);
             return true;
@@ -1790,15 +1910,24 @@ impl Metaphone3 {
 
     fn encode_j_as_vowel(&mut self) -> bool {
         if self.string_at(0, &["JEWSK"]) {
-            self.metaph_add_alt('J', '\0');  // J in primary only, nothing in secondary
+            self.metaph_add_alt('J', '\0'); // J in primary only, nothing in secondary
             return true;
         }
 
         // e.g. "stijl", "sejm"
-        if (self.string_at(1, &["L", "T", "K", "S", "N", "M"]) && !self.string_at(2, &["A"])) ||
-            self.string_start(&["FJ", "WOJ", "LJUB", "BJOR", "HAJEK", "HALLELUJA", "LJUBLJANA"]) ||
-            self.string_at(0, &["JAVIK", "JEVIC"]) ||
-            self.string_exact(&["SONJA", "TANJA", "TONJA"]) {
+        if (self.string_at(1, &["L", "T", "K", "S", "N", "M"]) && !self.string_at(2, &["A"]))
+            || self.string_start(&[
+                "FJ",
+                "WOJ",
+                "LJUB",
+                "BJOR",
+                "HAJEK",
+                "HALLELUJA",
+                "LJUBLJANA",
+            ])
+            || self.string_at(0, &["JAVIK", "JEVIC"])
+            || self.string_exact(&["SONJA", "TANJA", "TONJA"])
+        {
             return true;
         }
         false
@@ -1807,40 +1936,276 @@ impl Metaphone3 {
     fn names_beginning_with_j_that_get_alt_y(&self) -> bool {
         // Full list from Go - checking if name starts with J and matches common names
         self.string_start(&[
-            "JAN", "JON", "JIN", "JEN", "JUHL", "JULY", "JOEL", "JOHN", "JOSH", "JUDE", "JUNE",
-            "JONI", "JULI", "JENA", "JUNG", "JINA", "JANA", "JENI", "JANN", "JONA", "JENE",
-            "JULE", "JANI", "JONG", "JEAN", "JONE", "JARA", "JUST", "JOST", "JAHN", "JACO",
-            "JANG", "JOANN", "JANEY", "JANAE", "JOANA", "JUTTA", "JULEE", "JANAY", "JANEE",
-            "JETTA", "JOHNA", "JOANE", "JAYNA", "JANES", "JONAS", "JONIE", "JUSTA", "JUNIE",
-            "JUNKO", "JENAE", "JULIO", "JINNY", "JOHNS", "JACOB", "JETER", "JAFFE", "JESKE",
-            "JANKE", "JAGER", "JANIK", "JANDA", "JOSHI", "JULES", "JANTZ", "JEANS", "JUDAH",
-            "JANUS", "JENNY", "JENEE", "JONAH", "JOSUE", "JOSEF", "JULIE", "JULIA", "JANIE",
-            "JANIS", "JENNA", "JANNA", "JEANA", "JENNI", "JEANE", "JONNA", "JAKOB", "JORDAN",
-            "JORDON", "JOSEPH", "JOSHUA", "JOSIAH", "JOSPEH", "JUDSON", "JULIAN", "JULIUS",
-            "JUNIOR", "JUDITH", "JOESPH", "JOHNIE", "JOANNE", "JEANNE", "JOANNA", "JOSEFA",
-            "JULIET", "JANNIE", "JANELL", "JASMIN", "JANINE", "JOHNNY", "JEANIE", "JEANNA",
-            "JOHNNA", "JOELLE", "JOVITA", "JONNIE", "JANEEN", "JANINA", "JOANIE", "JAZMIN",
-            "JANENE", "JONELL", "JENELL", "JANETT", "JANETH", "JENINE", "JOELLA", "JOEANN",
-            "JOHANA", "JENICE", "JANNET", "JANISE", "JULENE", "JANEAN", "JAIMEE", "JOETTE",
-            "JANYCE", "JENEVA", "JACOBS", "JENSEN", "JANSEN", "JAEGER", "JACOBY", "JENSON",
-            "JARMAN", "JOSLIN", "JESSEN", "JAHNKE", "JACOBO", "JULIEN", "JEPSON", "JANSON",
-            "JACOBI", "JARBOE", "JOHSON", "JANZEN", "JETTON", "JUNKER", "JONSON", "JAROSZ",
-            "JENNER", "JAGGER", "JEPSEN", "JORDEN", "JANNEY", "JUHASZ", "JERGEN", "JOHNSON",
-            "JOHNNIE", "JASMINE", "JEANNIE", "JOHANNA", "JANELLE", "JANETTE", "JULIANA",
-            "JUSTINA", "JOSETTE", "JOELLEN", "JENELLE", "JULIETA", "JULIANN", "JULISSA",
-            "JENETTE", "JANETTA", "JOSELYN", "JONELLE", "JESENIA", "JANESSA", "JAZMINE",
-            "JEANENE", "JOANNIE", "JADWIGA", "JOLANDA", "JULIANE", "JANUARY", "JEANICE",
-            "JANELLA", "JEANETT", "JENNINE", "JOHANNE", "JOHNSIE", "JANIECE", "JENNELL",
-            "JAMISON", "JANSSEN", "JOHNSEN", "JARDINE", "JAGGERS", "JURGENS", "JOURDAN",
-            "JULIANO", "JOSEPHS", "JHONSON", "JOZWIAK", "JANICKI", "JELINEK", "JANSSON",
-            "JOACHIM", "JACOBUS", "JENNING", "JANTZEN", "JOSEFINA", "JEANNINE", "JULIANNE",
-            "JULIANNA", "JONATHAN", "JONATHON", "JEANETTE", "JANNETTE", "JEANETTA", "JOHNETTA",
-            "JENNEFER", "JULIENNE", "JOSPHINE", "JEANELLE", "JOHNETTE", "JULIEANN", "JOSEFINE",
-            "JULIETTA", "JOHNSTON", "JACOBSON", "JACOBSEN", "JOHANSEN", "JOHANSON", "JAWORSKI",
-            "JENNETTE", "JELLISON", "JOHANNES", "JASINSKI", "JUERGENS", "JARNAGIN", "JEREMIAH",
-            "JEPPESEN", "JARNIGAN", "JANOUSEK", "JOHNATHAN", "JOHNATHON", "JORGENSEN", "JEANMARIE",
-            "JOSEPHINA", "JEANNETTE", "JOSEPHINE", "JEANNETTA", "JORGENSON", "JANKOWSKI", "JOHNSTONE",
-            "JABLONSKI", "JOSEPHSON", "JOHANNSEN", "JURGENSEN", "JIMMERSON", "JOHANSSON", "JAKUBOWSKI",
+            "JAN",
+            "JON",
+            "JIN",
+            "JEN",
+            "JUHL",
+            "JULY",
+            "JOEL",
+            "JOHN",
+            "JOSH",
+            "JUDE",
+            "JUNE",
+            "JONI",
+            "JULI",
+            "JENA",
+            "JUNG",
+            "JINA",
+            "JANA",
+            "JENI",
+            "JANN",
+            "JONA",
+            "JENE",
+            "JULE",
+            "JANI",
+            "JONG",
+            "JEAN",
+            "JONE",
+            "JARA",
+            "JUST",
+            "JOST",
+            "JAHN",
+            "JACO",
+            "JANG",
+            "JOANN",
+            "JANEY",
+            "JANAE",
+            "JOANA",
+            "JUTTA",
+            "JULEE",
+            "JANAY",
+            "JANEE",
+            "JETTA",
+            "JOHNA",
+            "JOANE",
+            "JAYNA",
+            "JANES",
+            "JONAS",
+            "JONIE",
+            "JUSTA",
+            "JUNIE",
+            "JUNKO",
+            "JENAE",
+            "JULIO",
+            "JINNY",
+            "JOHNS",
+            "JACOB",
+            "JETER",
+            "JAFFE",
+            "JESKE",
+            "JANKE",
+            "JAGER",
+            "JANIK",
+            "JANDA",
+            "JOSHI",
+            "JULES",
+            "JANTZ",
+            "JEANS",
+            "JUDAH",
+            "JANUS",
+            "JENNY",
+            "JENEE",
+            "JONAH",
+            "JOSUE",
+            "JOSEF",
+            "JULIE",
+            "JULIA",
+            "JANIE",
+            "JANIS",
+            "JENNA",
+            "JANNA",
+            "JEANA",
+            "JENNI",
+            "JEANE",
+            "JONNA",
+            "JAKOB",
+            "JORDAN",
+            "JORDON",
+            "JOSEPH",
+            "JOSHUA",
+            "JOSIAH",
+            "JOSPEH",
+            "JUDSON",
+            "JULIAN",
+            "JULIUS",
+            "JUNIOR",
+            "JUDITH",
+            "JOESPH",
+            "JOHNIE",
+            "JOANNE",
+            "JEANNE",
+            "JOANNA",
+            "JOSEFA",
+            "JULIET",
+            "JANNIE",
+            "JANELL",
+            "JASMIN",
+            "JANINE",
+            "JOHNNY",
+            "JEANIE",
+            "JEANNA",
+            "JOHNNA",
+            "JOELLE",
+            "JOVITA",
+            "JONNIE",
+            "JANEEN",
+            "JANINA",
+            "JOANIE",
+            "JAZMIN",
+            "JANENE",
+            "JONELL",
+            "JENELL",
+            "JANETT",
+            "JANETH",
+            "JENINE",
+            "JOELLA",
+            "JOEANN",
+            "JOHANA",
+            "JENICE",
+            "JANNET",
+            "JANISE",
+            "JULENE",
+            "JANEAN",
+            "JAIMEE",
+            "JOETTE",
+            "JANYCE",
+            "JENEVA",
+            "JACOBS",
+            "JENSEN",
+            "JANSEN",
+            "JAEGER",
+            "JACOBY",
+            "JENSON",
+            "JARMAN",
+            "JOSLIN",
+            "JESSEN",
+            "JAHNKE",
+            "JACOBO",
+            "JULIEN",
+            "JEPSON",
+            "JANSON",
+            "JACOBI",
+            "JARBOE",
+            "JOHSON",
+            "JANZEN",
+            "JETTON",
+            "JUNKER",
+            "JONSON",
+            "JAROSZ",
+            "JENNER",
+            "JAGGER",
+            "JEPSEN",
+            "JORDEN",
+            "JANNEY",
+            "JUHASZ",
+            "JERGEN",
+            "JOHNSON",
+            "JOHNNIE",
+            "JASMINE",
+            "JEANNIE",
+            "JOHANNA",
+            "JANELLE",
+            "JANETTE",
+            "JULIANA",
+            "JUSTINA",
+            "JOSETTE",
+            "JOELLEN",
+            "JENELLE",
+            "JULIETA",
+            "JULIANN",
+            "JULISSA",
+            "JENETTE",
+            "JANETTA",
+            "JOSELYN",
+            "JONELLE",
+            "JESENIA",
+            "JANESSA",
+            "JAZMINE",
+            "JEANENE",
+            "JOANNIE",
+            "JADWIGA",
+            "JOLANDA",
+            "JULIANE",
+            "JANUARY",
+            "JEANICE",
+            "JANELLA",
+            "JEANETT",
+            "JENNINE",
+            "JOHANNE",
+            "JOHNSIE",
+            "JANIECE",
+            "JENNELL",
+            "JAMISON",
+            "JANSSEN",
+            "JOHNSEN",
+            "JARDINE",
+            "JAGGERS",
+            "JURGENS",
+            "JOURDAN",
+            "JULIANO",
+            "JOSEPHS",
+            "JHONSON",
+            "JOZWIAK",
+            "JANICKI",
+            "JELINEK",
+            "JANSSON",
+            "JOACHIM",
+            "JACOBUS",
+            "JENNING",
+            "JANTZEN",
+            "JOSEFINA",
+            "JEANNINE",
+            "JULIANNE",
+            "JULIANNA",
+            "JONATHAN",
+            "JONATHON",
+            "JEANETTE",
+            "JANNETTE",
+            "JEANETTA",
+            "JOHNETTA",
+            "JENNEFER",
+            "JULIENNE",
+            "JOSPHINE",
+            "JEANELLE",
+            "JOHNETTE",
+            "JULIEANN",
+            "JOSEFINE",
+            "JULIETTA",
+            "JOHNSTON",
+            "JACOBSON",
+            "JACOBSEN",
+            "JOHANSEN",
+            "JOHANSON",
+            "JAWORSKI",
+            "JENNETTE",
+            "JELLISON",
+            "JOHANNES",
+            "JASINSKI",
+            "JUERGENS",
+            "JARNAGIN",
+            "JEREMIAH",
+            "JEPPESEN",
+            "JARNIGAN",
+            "JANOUSEK",
+            "JOHNATHAN",
+            "JOHNATHON",
+            "JORGENSEN",
+            "JEANMARIE",
+            "JOSEPHINA",
+            "JEANNETTE",
+            "JOSEPHINE",
+            "JEANNETTA",
+            "JORGENSON",
+            "JANKOWSKI",
+            "JOHNSTONE",
+            "JABLONSKI",
+            "JOSEPHSON",
+            "JOHANNSEN",
+            "JURGENSEN",
+            "JIMMERSON",
+            "JOHANSSON",
+            "JAKUBOWSKI",
         ])
     }
 
@@ -1865,8 +2230,9 @@ impl Metaphone3 {
         }
 
         // e.g. "know", "knit", "knob"
-        if (self.string_at(1, &["NOW", "NIT", "NOT", "NOB"]) && !self.string_start(&["BANKNOTE"])) ||
-            self.string_at(1, &["NOCK", "NUCK", "NIFE", "NACK", "NIGHT"]) {
+        if (self.string_at(1, &["NOW", "NIT", "NOT", "NOB"]) && !self.string_start(&["BANKNOTE"]))
+            || self.string_at(1, &["NOCK", "NUCK", "NIFE", "NACK", "NIGHT"])
+        {
             // N already encoded before
             // e.g. "penknife"
             if self.idx > 0 && self.char_at(-1, 'N') {
@@ -1886,9 +2252,15 @@ impl Metaphone3 {
 
         self.interpolate_vowel_when_cons_l_at_end();
 
-        if self.encode_lely_to_l() || self.encode_colonel() || self.encode_french_ault() ||
-            self.encode_french_euil() || self.encode_french_oulx() || self.encode_silent_l_in_lm() ||
-            self.encode_silent_l_in_lk_lv() || self.encode_silent_l_in_ould() {
+        if self.encode_lely_to_l()
+            || self.encode_colonel()
+            || self.encode_french_ault()
+            || self.encode_french_euil()
+            || self.encode_french_oulx()
+            || self.encode_silent_l_in_lm()
+            || self.encode_silent_l_in_lk_lv()
+            || self.encode_silent_l_in_ould()
+        {
             return;
         }
 
@@ -1929,12 +2301,13 @@ impl Metaphone3 {
 
     fn encode_french_ault(&mut self) -> bool {
         // e.g. "renault" and "foucault", well known to americans, but not "fault"
-        if self.idx > 3 &&
-            (self.string_at(-3, &["RAULT", "NAULT", "BAULT", "SAULT", "GAULT", "CAULT"]) ||
-             self.string_at(-4, &["REAULT", "RIAULT", "NEAULT", "BEAULT"])) &&
-            !(self.root_or_inflections("ASSAULT") || self.string_at(-8, &["SOMERSAULT"]) ||
-              self.string_at(-9, &["SUMMERSAULT"])) {
-
+        if self.idx > 3
+            && (self.string_at(-3, &["RAULT", "NAULT", "BAULT", "SAULT", "GAULT", "CAULT"])
+                || self.string_at(-4, &["REAULT", "RIAULT", "NEAULT", "BEAULT"]))
+            && !(self.root_or_inflections("ASSAULT")
+                || self.string_at(-8, &["SOMERSAULT"])
+                || self.string_at(-9, &["SUMMERSAULT"]))
+        {
             self.idx += 1;
             return true;
         }
@@ -1962,15 +2335,16 @@ impl Metaphone3 {
     fn encode_silent_l_in_lm(&mut self) -> bool {
         if self.string_at(0, &["LM", "LN"]) {
             // e.g. "lincoln", "holmes", "psalm", "salmon"
-            if (self.string_at(-2, &["COLN", "CALM", "BALM", "MALM", "PALM"]) ||
-                self.string_at_end(-1, &["OLM"]) ||
-                self.string_at(-3, &["PSALM", "QUALM"]) ||
-                self.string_at(-2, &["SALMON", "HOLMES"]) ||
-                self.string_at(-1, &["ALMOND"]) ||
-                self.string_at_start(-1, &["ALMS"])) &&
-                (!self.string_at(2, &["A"]) &&
-                 !self.string_at(-2, &["BALMO", "PALMER", "PALMOR", "BALMER"]) &&
-                 !self.string_at(-3, &["THALM"])) {
+            if (self.string_at(-2, &["COLN", "CALM", "BALM", "MALM", "PALM"])
+                || self.string_at_end(-1, &["OLM"])
+                || self.string_at(-3, &["PSALM", "QUALM"])
+                || self.string_at(-2, &["SALMON", "HOLMES"])
+                || self.string_at(-1, &["ALMOND"])
+                || self.string_at_start(-1, &["ALMS"]))
+                && (!self.string_at(2, &["A"])
+                    && !self.string_at(-2, &["BALMO", "PALMER", "PALMOR", "BALMER"])
+                    && !self.string_at(-3, &["THALM"]))
+            {
                 // silent - do nothing
             } else {
                 self.metaph_add('L');
@@ -1983,15 +2357,22 @@ impl Metaphone3 {
     }
 
     fn encode_silent_l_in_lk_lv(&mut self) -> bool {
-        if (self.string_at(-2, &["WALK", "YOLK", "FOLK", "HALF", "TALK", "CALF", "BALK", "CALK"]) ||
-            (self.string_at(-2, &["POLK", "HALV", "SALVE", "CALVE", "SOLDER"]) &&
-             !self.string_at(-2, &["POLKA", "PALKO", "HALVA", "HALVO", "SALVER", "CALVER"])) ||
-            (self.string_at(-3, &["CAULK", "CHALK", "BAULK", "FAULK"]) &&
-             !self.string_at(-4, &["SCHALK"]))) &&
-            !self.string_at(-5, &["GONSALVES", "GONCALVES"]) &&
-            !self.string_at(-2, &["BALKAN", "TALKAL"]) &&
-            !self.string_at(-3, &["PAULK", "CHALF"]) {
-
+        if (self.string_at(
+            -2,
+            &[
+                "WALK", "YOLK", "FOLK", "HALF", "TALK", "CALF", "BALK", "CALK",
+            ],
+        ) || (self.string_at(-2, &["POLK", "HALV", "SALVE", "CALVE", "SOLDER"])
+            && !self.string_at(
+                -2,
+                &["POLKA", "PALKO", "HALVA", "HALVO", "SALVER", "CALVER"],
+            ))
+            || (self.string_at(-3, &["CAULK", "CHALK", "BAULK", "FAULK"])
+                && !self.string_at(-4, &["SCHALK"])))
+            && !self.string_at(-5, &["GONSALVES", "GONCALVES"])
+            && !self.string_at(-2, &["BALKAN", "TALKAL"])
+            && !self.string_at(-3, &["PAULK", "CHALF"])
+        {
             return true;
         }
 
@@ -2000,8 +2381,9 @@ impl Metaphone3 {
 
     fn encode_silent_l_in_ould(&mut self) -> bool {
         // 'would', 'could'
-        if self.string_at(-3, &["WOULD", "COULD"]) ||
-            (self.string_at(-4, &["SHOULD"]) && !self.string_at(-4, &["SHOULDER"])) {
+        if self.string_at(-3, &["WOULD", "COULD"])
+            || (self.string_at(-4, &["SHOULD"]) && !self.string_at(-4, &["SHOULDER"]))
+        {
             self.metaph_add_exact_approx('D', 'T');
             self.idx += 1;
             return true;
@@ -2022,8 +2404,8 @@ impl Metaphone3 {
             self.string_start(&["ROBILL", "BROUILL", "GREMILL"]) ||
             // e.g. 'mireille'
             // exception "reveille" usually pronounced as 're-vil-lee'
-            (self.string_at_end(-2, &["EILLE"]) && !self.string_at(-5, &["REVEILLE"])) {
-
+            (self.string_at_end(-2, &["EILLE"]) && !self.string_at(-5, &["REVEILLE"]))
+        {
             self.idx += 1;
             return true;
         }
@@ -2035,11 +2417,14 @@ impl Metaphone3 {
         // spanish e.g. "cabrillo", "gallegos" but also "gorilla", "ballerina" -
         // give both pronunciations since an american might pronounce "cabrillo"
         // in the spanish or the american fashion.
-        if self.string_at_end(-1, &["ILLO", "ILLA", "ALLE"]) ||
-            (self.string_end(&["A", "O", "AS", "OS"]) && self.string_at(-1, &["AL", "IL"]) &&
-             !self.string_at(-1, &["ALLA"])) ||
-            self.string_start(&["LLA", "VILLE", "VILLA", "GALLARDO", "VALLADAR", "MAGALLAN", "CAVALLAR", "BALLASTE"]) {
-
+        if self.string_at_end(-1, &["ILLO", "ILLA", "ALLE"])
+            || (self.string_end(&["A", "O", "AS", "OS"])
+                && self.string_at(-1, &["AL", "IL"])
+                && !self.string_at(-1, &["ALLA"]))
+            || self.string_start(&[
+                "LLA", "VILLE", "VILLA", "GALLARDO", "VALLADAR", "MAGALLAN", "CAVALLAR", "BALLASTE",
+            ])
+        {
             self.metaph_add_alt('L', '\0');
             self.idx += 1;
             return true;
@@ -2081,8 +2466,8 @@ impl Metaphone3 {
             !self.string_at(offset - 4, &["PROBLEM", "RESPLEN"]) &&
             !self.string_at(offset - 3, &["REPLEN"]) &&
             !self.string_at(offset - 2, &["SPLE"]) &&
-            !self.char_at(offset - 1, 'H') && !self.char_at(offset - 1, 'W') {
-
+            !self.char_at(offset - 1, 'H') && !self.char_at(offset - 1, 'W')
+        {
             self.metaph_add_str("AL", "AL");
             self.flag_al_inversion = true;
 
@@ -2099,11 +2484,14 @@ impl Metaphone3 {
     fn encode_vowel_preserve_vowel_after_l(&mut self, idx: usize) -> bool {
         let offset = (idx as isize) - (self.idx as isize);
 
-        if self.encode_vowels && !self.is_vowel_at(offset - 1) && self.char_at(offset + 1, 'E') &&
-            idx > 1 && idx + 1 != self.last_idx &&
-            !(self.string_at(offset + 1, &["ES", "ED"]) && idx + 2 == self.last_idx) &&
-            !self.string_at(offset - 1, &["RLEST"]) {
-
+        if self.encode_vowels
+            && !self.is_vowel_at(offset - 1)
+            && self.char_at(offset + 1, 'E')
+            && idx > 1
+            && idx + 1 != self.last_idx
+            && !(self.string_at(offset + 1, &["ES", "ED"]) && idx + 2 == self.last_idx)
+            && !self.string_at(offset - 1, &["RLEST"])
+        {
             self.metaph_add_str("LA", "LA");
             self.idx = self.skip_vowels(self.idx + 1);
             return true;
@@ -2168,7 +2556,17 @@ impl Metaphone3 {
     fn encode_mac(&mut self) -> bool {
         // should only find irish and
         // scottish names e.g. 'macintosh'
-        if self.string_at_start(0, &["MC", "MACIVER", "MACEWEN", "MACELROY", "MACILROY", "MACINTOSH"]) {
+        if self.string_at_start(
+            0,
+            &[
+                "MC",
+                "MACIVER",
+                "MACEWEN",
+                "MACELROY",
+                "MACILROY",
+                "MACINTOSH",
+            ],
+        ) {
             if self.encode_vowels {
                 self.metaph_add_str("MAK", "MAK");
             } else {
@@ -2470,8 +2868,10 @@ impl Metaphone3 {
 
     //Encode "-RZ-" according to american and polish pronunciations
     fn encode_rz(&mut self) -> bool {
-        if self.string_at(-2, &["GARZ", "KURZ", "MARZ", "MERZ", "HERZ", "PERZ", "WARZ"])
-            || self.string_at(0, &["RZANO", "RZOLA"])
+        if self.string_at(
+            -2,
+            &["GARZ", "KURZ", "MARZ", "MERZ", "HERZ", "PERZ", "WARZ"],
+        ) || self.string_at(0, &["RZANO", "RZOLA"])
             || self.string_at(-1, &["ARZA", "ARZN"])
         {
             return false;
@@ -2577,14 +2977,30 @@ impl Metaphone3 {
     }
 
     fn encode_s(&mut self) {
-        if self.encode_skj() || self.encode_special_sw() || self.encode_sj() ||
-            self.encode_silent_french_s_final() || self.encode_silent_french_s_internal() ||
-            self.encode_isl() || self.encode_stl() || self.encode_christmas() ||
-            self.encode_sthm() || self.encode_isten() || self.encode_sugar() ||
-            self.encode_sh() || self.encode_sch() || self.encode_sur() || self.encode_su() ||
-            self.encode_ssio() || self.encode_ss() || self.encode_sia() || self.encode_sio() ||
-            self.encode_anglicisations() || self.encode_sc() || self.encode_sei_sui_sier() ||
-            self.encode_sea() {
+        if self.encode_skj()
+            || self.encode_special_sw()
+            || self.encode_sj()
+            || self.encode_silent_french_s_final()
+            || self.encode_silent_french_s_internal()
+            || self.encode_isl()
+            || self.encode_stl()
+            || self.encode_christmas()
+            || self.encode_sthm()
+            || self.encode_isten()
+            || self.encode_sugar()
+            || self.encode_sh()
+            || self.encode_sch()
+            || self.encode_sur()
+            || self.encode_su()
+            || self.encode_ssio()
+            || self.encode_ss()
+            || self.encode_sia()
+            || self.encode_sio()
+            || self.encode_anglicisations()
+            || self.encode_sc()
+            || self.encode_sei_sui_sier()
+            || self.encode_sea()
+        {
             return;
         }
 
@@ -2622,14 +3038,35 @@ impl Metaphone3 {
     }
 
     fn names_beginning_with_sw_that_get_alt_sv(&self) -> bool {
-        self.string_start(&["SWANSON", "SWENSON", "SWINSON", "SWENSEN", "SWOBODA",
-            "SWIDERSKI", "SWARTHOUT", "SWEARENGIN"])
+        self.string_start(&[
+            "SWANSON",
+            "SWENSON",
+            "SWINSON",
+            "SWENSEN",
+            "SWOBODA",
+            "SWIDERSKI",
+            "SWARTHOUT",
+            "SWEARENGIN",
+        ])
     }
 
     fn names_beginning_with_sw_that_get_alv_xv(&self) -> bool {
-        self.string_start(&["SWART", "SWARTZ", "SWARTS", "SWIGER",
-            "SWITZER", "SWANGER", "SWIGERT", "SWIGART", "SWIHART",
-            "SWEITZER", "SWATZELL", "SWINDLER", "SWINEHART", "SWEARINGEN"])
+        self.string_start(&[
+            "SWART",
+            "SWARTZ",
+            "SWARTS",
+            "SWIGER",
+            "SWITZER",
+            "SWANGER",
+            "SWIGERT",
+            "SWIGART",
+            "SWIHART",
+            "SWEITZER",
+            "SWATZELL",
+            "SWINDLER",
+            "SWINEHART",
+            "SWEARINGEN",
+        ])
     }
 
     fn encode_sj(&mut self) -> bool {
@@ -2648,17 +3085,29 @@ impl Metaphone3 {
             return true;
         }
 
-        if self.idx == self.last_idx &&
-            ((self.string_start(&["YVES", "ARKANSAS", "FRANCAIS", "CRUDITES", "BRUYERES",
-                "DESCARTES", "DESCHUTES", "DESCHAMPS", "DESROCHES", "DESCHENES",
-                "RENDEZVOUS", "CONTRETEMPS", "DESLAURIERS"]) ||
-                self.string_exact(&["HORS"]) ||
-                self.string_end(&["CAMUS", "YPRES",
-                    "MESNES", "DEBRIS", "BLANCS", "INGRES", "CANNES",
-                    "CHABLIS", "APROPOS", "JACQUES", "ELYSEES", "OEUVRES", "GEORGES", "DESPRES"])) ||
-                (self.string_at(-2, &["AI", "OI", "UI"]) &&
-                 !self.string_start(&["LOIS", "LUIS"]))) {
-
+        if self.idx == self.last_idx
+            && ((self.string_start(&[
+                "YVES",
+                "ARKANSAS",
+                "FRANCAIS",
+                "CRUDITES",
+                "BRUYERES",
+                "DESCARTES",
+                "DESCHUTES",
+                "DESCHAMPS",
+                "DESROCHES",
+                "DESCHENES",
+                "RENDEZVOUS",
+                "CONTRETEMPS",
+                "DESLAURIERS",
+            ]) || self.string_exact(&["HORS"])
+                || self.string_end(&[
+                    "CAMUS", "YPRES", "MESNES", "DEBRIS", "BLANCS", "INGRES", "CANNES", "CHABLIS",
+                    "APROPOS", "JACQUES", "ELYSEES", "OEUVRES", "GEORGES", "DESPRES",
+                ]))
+                || (self.string_at(-2, &["AI", "OI", "UI"])
+                    && !self.string_start(&["LOIS", "LUIS"])))
+        {
             return true;
         }
         false
@@ -2666,20 +3115,34 @@ impl Metaphone3 {
 
     fn encode_silent_french_s_internal(&mut self) -> bool {
         // french words familiar to americans where internal s is silent
-        self.string_at(-2, &["MESNES", "DESCHAM", "DESPRES", "DESROCH", "DESROSI", "DESJARD", "DESMARA",
-            "DESCHEN", "DESHOTE", "DESLAUR", "DESCARTES"]) ||
-            self.string_at(-5, &["DUQUESNE", "DUCHESNE"]) ||
-            self.string_at(-3, &["FRESNEL", "GROSVENOR"]) ||
-            self.string_at(-4, &["LOUISVILLE"]) ||
-            self.string_at(-7, &["BEAUCHESNE", "ILLINOISAN"])
+        self.string_at(
+            -2,
+            &[
+                "MESNES",
+                "DESCHAM",
+                "DESPRES",
+                "DESROCH",
+                "DESROSI",
+                "DESJARD",
+                "DESMARA",
+                "DESCHEN",
+                "DESHOTE",
+                "DESLAUR",
+                "DESCARTES",
+            ],
+        ) || self.string_at(-5, &["DUQUESNE", "DUCHESNE"])
+            || self.string_at(-3, &["FRESNEL", "GROSVENOR"])
+            || self.string_at(-4, &["LOUISVILLE"])
+            || self.string_at(-7, &["BEAUCHESNE", "ILLINOISAN"])
     }
 
     fn encode_isl(&mut self) -> bool {
         // special cases 'island', 'isle', 'carlisle', 'carlysle'
-        (self.string_at(-2, &["LISL", "LYSL", "AISL"]) &&
-            !self.string_at(-3, &["PAISLEY", "BAISLEY", "ALISLAM", "ALISLAH", "ALISLAA"])) ||
-            (self.idx == 1 && (self.string_at(-1, &["ISLE", "ISLAN"]) &&
-             !self.string_at(-1, &["ISLEY", "ISLER"])))
+        (self.string_at(-2, &["LISL", "LYSL", "AISL"])
+            && !self.string_at(-3, &["PAISLEY", "BAISLEY", "ALISLAM", "ALISLAH", "ALISLAA"]))
+            || (self.idx == 1
+                && (self.string_at(-1, &["ISLE", "ISLAN"])
+                    && !self.string_at(-1, &["ISLEY", "ISLER"])))
     }
 
     fn encode_stl(&mut self) -> bool {
@@ -2687,19 +3150,28 @@ impl Metaphone3 {
         if (self.string_at(0, &["STLE", "STLI"]) && !self.string_at(2, &["LESS", "LIKE", "LINE"])) ||
             self.string_at(-3, &["THISTLY", "BRISTLY", "GRISTLY"]) ||
             // e.g. "corpuscle"
-            self.string_at(-1, &["USCLE"]) {
-
+            self.string_at(-1, &["USCLE"])
+        {
             // KRISTEN, KRYSTLE, CRYSTLE, KRISTLE all pronounce the 't'
             // also, exceptions where "-LING" is a nominalizing suffix
-            if self.string_start(&["KRISTEN", "KRYSTLE", "CRYSTLE", "KRISTLE", "CHRISTENSEN", "CHRISTENSON"]) ||
-                self.string_at(-3, &["FIRSTLING"]) ||
-                self.string_at(-2, &["NESTLING", "WESTLING"]) {
+            if self.string_start(&[
+                "KRISTEN",
+                "KRYSTLE",
+                "CRYSTLE",
+                "KRISTLE",
+                "CHRISTENSEN",
+                "CHRISTENSON",
+            ]) || self.string_at(-3, &["FIRSTLING"])
+                || self.string_at(-2, &["NESTLING", "WESTLING"])
+            {
                 self.metaph_add_str("ST", "ST");
                 self.idx += 1;
             } else {
-                if self.encode_vowels && self.char_at(3, 'E') && !self.char_at(4, 'R') &&
-                    !self.string_at(3, &["EY", "ETTE", "ETTA"]) {
-
+                if self.encode_vowels
+                    && self.char_at(3, 'E')
+                    && !self.char_at(4, 'R')
+                    && !self.string_at(3, &["EY", "ETTE", "ETTA"])
+                {
                     self.metaph_add_str("SAL", "SAL");
                     self.flag_al_inversion = true;
                 } else {
@@ -2746,8 +3218,9 @@ impl Metaphone3 {
         }
 
         // e.g. 'glisten', 'listen'
-        if self.string_at(-2, &["LISTEN", "RISTEN", "HASTEN", "FASTEN", "MUSTNT"]) ||
-            self.string_at(-3, &["MOISTEN"]) {
+        if self.string_at(-2, &["LISTEN", "RISTEN", "HASTEN", "FASTEN", "MUSTNT"])
+            || self.string_at(-3, &["MOISTEN"])
+        {
             self.metaph_add('S');
             self.idx += 1;
             return true;
@@ -2774,8 +3247,8 @@ impl Metaphone3 {
             }
 
             // combining forms, e.g. 'clotheshorse', 'woodshole'
-            if self.idx > 0 &&
-                (self.string_at_end(1, &["HAP"]) ||
+            if self.idx > 0
+                && (self.string_at_end(1, &["HAP"]) ||
                     // e.g. "hartsheim", "clothshorse"
                     // e.g. "dishonor"
                     self.string_at(1, &["HEIM", "HOEK", "HOLM", "HOLZ", "HOOD", "HEAD", "HEID",
@@ -2788,7 +3261,8 @@ impl Metaphone3 {
                     (self.string_at(1, &["HOUR"]) && !self.string_start(&["ASHOUR", "BASHOUR", "MANSHOUR"])) ||
                     // e.g. "dishonest", "grasshopper"
                     self.string_at(2, &["ARMON", "ONEST", "ALLOW", "OLDER", "OPPER", "EIMER",
-                        "ANDLE", "ONOUR", "ABILLE", "UMANCE", "ABITUA"])) {
+                        "ANDLE", "ONOUR", "ABILLE", "UMANCE", "ABITUA"]))
+            {
                 if !self.string_at(-1, &["S"]) {
                     self.metaph_add('S');
                 }
@@ -2809,8 +3283,8 @@ impl Metaphone3 {
             if self.idx > 0 &&
                 // e.g. "mischief", "escheat"
                 (self.string_at(3, &["IEF", "EAT", "ANCE", "ARGE"]) ||
-                    self.string_start(&["ESCHEW"])) {
-
+                    self.string_start(&["ESCHEW"]))
+            {
                 self.metaph_add('S');
                 return true;
             }
@@ -2818,18 +3292,21 @@ impl Metaphone3 {
             // Schlesinger's rule
             // dutch, danish, italian, greek origin, e.g. "school", "schooner", "schiavone",
             // "schiz-"
-            if (self.string_at(3, &["OO", "ER", "EN", "UY", "ED", "EM", "IA", "IZ", "IS", "OL"]) &&
-                !self.string_at(0, &["SCHOLT", "SCHISL", "SCHERR"])) ||
-                self.string_at(3, &["ISZ"]) ||
-                (self.string_at(-1, &["ESCHAT", "ASCHIN", "ASCHAL", "ISCHAE", "ISCHIA"]) &&
-                    !self.string_at(-2, &["FASCHING"])) ||
-                self.string_at_end(-1, &["ESCHI"]) ||
-                self.char_at(3, 'Y') {
+            if (self.string_at(
+                3,
+                &["OO", "ER", "EN", "UY", "ED", "EM", "IA", "IZ", "IS", "OL"],
+            ) && !self.string_at(0, &["SCHOLT", "SCHISL", "SCHERR"]))
+                || self.string_at(3, &["ISZ"])
+                || (self.string_at(-1, &["ESCHAT", "ASCHIN", "ASCHAL", "ISCHAE", "ISCHIA"])
+                    && !self.string_at(-2, &["FASCHING"]))
+                || self.string_at_end(-1, &["ESCHI"])
+                || self.char_at(3, 'Y')
+            {
                 // e.g. "schermerhorn", "schenker", "schistose"
 
-                if self.string_at(3, &["ER", "EN", "IS"]) &&
-                    (self.idx + 4 == self.last_idx || self.string_at(3, &["ENK", "ENB", "IST"])) {
-
+                if self.string_at(3, &["ER", "EN", "IS"])
+                    && (self.idx + 4 == self.last_idx || self.string_at(3, &["ENK", "ENB", "IST"]))
+                {
                     self.metaph_add_str("X", "SK");
                 } else {
                     self.metaph_add_str("SK", "SK");
@@ -2899,7 +3376,13 @@ impl Metaphone3 {
     fn encode_ss(&mut self) -> bool {
         // e.g. "russian", "pressure"
         // e.g. "hessian", "assurance"
-        if self.string_at(-1, &["USSIA", "ESSUR", "ISSUR", "ISSUE", "ESSIAN", "ASSURE", "ASSURA", "ISSUAB", "ISSUAN", "ASSIUS"]) {
+        if self.string_at(
+            -1,
+            &[
+                "USSIA", "ESSUR", "ISSUR", "ISSUE", "ESSIAN", "ASSURE", "ASSURA", "ISSUAB",
+                "ISSUAN", "ASSIUS",
+            ],
+        ) {
             self.metaph_add('X');
             self.advance_counter(2, 1);
             return true;
@@ -2916,10 +3399,10 @@ impl Metaphone3 {
         }
 
         // names generally get 'X' where terms, e.g. "aphasia" get 'J'
-        if (self.string_at_start(-3, &["ALESIA", "ALYSIA", "ALISIA", "STASIA"]) &&
-            !self.string_start(&["ANASTASIA"])) ||
-            self.string_at(-5, &["THERESIA", "DIONYSIAN"]) {
-
+        if (self.string_at_start(-3, &["ALESIA", "ALYSIA", "ALISIA", "STASIA"])
+            && !self.string_start(&["ANASTASIA"]))
+            || self.string_at(-5, &["THERESIA", "DIONYSIAN"])
+        {
             self.metaph_add_alt('X', 'S');
             self.advance_counter(2, 0);
             return true;
@@ -2931,8 +3414,8 @@ impl Metaphone3 {
                 !(self.string_start(&["JAMES", "NICOS", "PEGAS", "PEPYS",
                     "HOBBES", "HOLMES", "JAQUES", "KEYNES",
                     "MALTHUS", "HOMOOUS", "MAGLEMOS", "HOMOIOUS",
-                    "LEVALLOIS", "TARDENOIS"]) || self.string_at(-4, &["ALGES"])) {
-
+                    "LEVALLOIS", "TARDENOIS"]) || self.string_at(-4, &["ALGES"]))
+            {
                 self.metaph_add('J');
             } else {
                 self.metaph_add('S');
@@ -2996,12 +3479,15 @@ impl Metaphone3 {
             if self.string_at(2, &["I", "E", "Y"]) {
                 // e.g. "conscious"
                 // e.g. "prosciutto"
-                if self.string_at(2, &["IUT", "IOUS"]) || self.string_at(-2, &["FASCIS"]) ||
-                    self.string_at(-3, &["CONSCIEN", "CRESCEND", "CONSCION"]) ||
-                    self.string_at(-4, &["OMNISCIEN"]) {
+                if self.string_at(2, &["IUT", "IOUS"])
+                    || self.string_at(-2, &["FASCIS"])
+                    || self.string_at(-3, &["CONSCIEN", "CRESCEND", "CONSCION"])
+                    || self.string_at(-4, &["OMNISCIEN"])
+                {
                     self.metaph_add('X');
-                } else if self.string_at(0, &["SCIVV", "SCIRO", "SCIPIO", "SCEPTIC", "SCEPSIS"]) ||
-                    self.string_at(-2, &["PISCITELLI"]) {
+                } else if self.string_at(0, &["SCIVV", "SCIRO", "SCIPIO", "SCEPTIC", "SCEPSIS"])
+                    || self.string_at(-2, &["PISCITELLI"])
+                {
                     self.metaph_add_str("SK", "SK");
                 } else {
                     self.metaph_add('S');
@@ -3022,11 +3508,12 @@ impl Metaphone3 {
         // "nausea" by itself has => NJ as a more likely encoding. Other forms
         // using "nause-" (see encode_sea()) have X or S as more familiar
         // pronunciations
-        if self.string_at_end(-3, &["NAUSEA"]) ||
-            self.string_at(-2, &["CASUI"]) ||
-            (self.string_at(-1, &["OSIER", "ASIER"]) &&
-                !(self.string_start(&["OSIER", "EASIER"]) || self.string_at(-2, &["ROSIER", "MOSIER"]))) {
-
+        if self.string_at_end(-3, &["NAUSEA"])
+            || self.string_at(-2, &["CASUI"])
+            || (self.string_at(-1, &["OSIER", "ASIER"])
+                && !(self.string_start(&["OSIER", "EASIER"])
+                    || self.string_at(-2, &["ROSIER", "MOSIER"])))
+        {
             self.metaph_add_alt('J', 'X');
             self.advance_counter(2, 0);
             return true;
@@ -3037,8 +3524,9 @@ impl Metaphone3 {
 
     fn encode_sea(&mut self) -> bool {
         //TODO: bug?  NAUSEO and not NAUSEAT?
-        if self.string_exact(&["SEAN"]) ||
-            (self.string_at(-3, &["NAUSEO"]) && !self.string_at(-3, &["NAUSEAT"])) {
+        if self.string_exact(&["SEAN"])
+            || (self.string_at(-3, &["NAUSEO"]) && !self.string_at(-3, &["NAUSEAT"]))
+        {
             self.metaph_add('X');
             self.advance_counter(2, 0);
             return true;
@@ -3124,7 +3612,12 @@ impl Metaphone3 {
         (self.string_at_end(-4, &["MONET", "GENET", "CHAUT"])
             || self.string_at(-2, &["POTPOURRI"])
             || self.string_at(-3, &["MORTGAGE", "BOATSWAIN"])
-            || self.string_at(-4, &["BERET", "BIDET", "FILET", "DEBUT", "DEPOT", "PINOT", "TAROT"])
+            || self.string_at(
+                -4,
+                &[
+                    "BERET", "BIDET", "FILET", "DEBUT", "DEPOT", "PINOT", "TAROT",
+                ],
+            )
             || self.string_at(
                 -5,
                 &[
@@ -3148,7 +3641,13 @@ impl Metaphone3 {
             )
             || self.string_at(
                 -8,
-                &["SOBRIQUET", "CABRIOLET", "CASSOULET", "OUBRIQUET", "CAMEMBERT"],
+                &[
+                    "SOBRIQUET",
+                    "CABRIOLET",
+                    "CASSOULET",
+                    "OUBRIQUET",
+                    "CAMEMBERT",
+                ],
             ))
             && !self.string_at(1, &["AN", "RY", "IC", "OM", "IN"])
     }
@@ -3230,7 +3729,8 @@ impl Metaphone3 {
                 || self.string_at(1, &["IATE", "IATI", "IABL", "IATO", "IARY"])
                 || self.string_at(-5, &["CHRISTIAN"]))
         {
-            if self.string_at_start(-2, &["ANTI"]) || self.string_start(&["PATIO", "PITIA", "DUTIA"])
+            if self.string_at_start(-2, &["ANTI"])
+                || self.string_start(&["PATIO", "PITIA", "DUTIA"])
             {
                 self.metaph_add('T');
             } else if self.string_at(-4, &["EQUATION"]) {
@@ -3501,49 +4001,327 @@ impl Metaphone3 {
 
     fn germanic_or_slavic_name_beginning_with_w(&self) -> bool {
         self.string_start(&[
-            "WEE", "WIX", "WAX", "WOLF", "WEIS", "WAHL", "WALZ", "WEIL", "WERT", "WINE", "WILK",
-            "WALT", "WOLL", "WADA", "WULF", "WEHR", "WURM", "WYSE", "WENZ", "WIRT", "WOLK",
-            "WEIN", "WYSS", "WASS", "WANN", "WINT", "WINK", "WILE", "WIKE", "WIER", "WELK",
-            "WISE", "WIRTH", "WIESE", "WITTE", "WENTZ", "WOLFF", "WENDT", "WERTZ", "WILKE",
-            "WALTZ", "WEISE", "WOOLF", "WERTH", "WEESE", "WURTH", "WINES", "WARGO", "WIMER",
-            "WISER", "WAGER", "WILLE", "WILDS", "WAGAR", "WERTS", "WITTY", "WIENS", "WIEBE",
-            "WIRTZ", "WYMER", "WULFF", "WIBLE", "WINER", "WIEST", "WALKO", "WALLA", "WEBRE",
-            "WEYER", "WYBLE", "WOMAC", "WILTZ", "WURST", "WOLAK", "WELKE", "WEDEL", "WEIST",
-            "WYGAN", "WUEST", "WEISZ", "WALCK", "WEITZ", "WYDRA", "WANDA", "WILMA", "WEBER",
-            "WETZEL", "WEINER", "WENZEL", "WESTER", "WALLEN", "WENGER", "WALLIN", "WEILER",
-            "WIMMER", "WEIMER", "WYRICK", "WEGNER", "WINNER", "WESSEL", "WILKIE", "WEIGEL",
-            "WOJCIK", "WENDEL", "WITTER", "WIENER", "WEISER", "WEXLER", "WACKER", "WISNER",
-            "WITMER", "WINKLE", "WELTER", "WIDMER", "WITTEN", "WINDLE", "WASHER", "WOLTER",
-            "WILKEY", "WIDNER", "WARMAN", "WEYANT", "WEIBEL", "WANNER", "WILKEN", "WILTSE",
-            "WARNKE", "WALSER", "WEIKEL", "WESNER", "WITZEL", "WROBEL", "WAGNON", "WINANS",
-            "WENNER", "WOLKEN", "WILNER", "WYSONG", "WYCOFF", "WUNDER", "WINKEL", "WIDMAN",
-            "WELSCH", "WEHNER", "WEIGLE", "WETTER", "WUNSCH", "WHITTY", "WAXMAN", "WILKER",
-            "WILHAM", "WITTIG", "WITMAN", "WESTRA", "WEHRLE", "WASSER", "WILLER", "WEGMAN",
-            "WARFEL", "WYNTER", "WERNER", "WAGNER", "WISSER", "WISEMAN", "WINKLER", "WILHELM",
-            "WELLMAN", "WAMPLER", "WACHTER", "WALTHER", "WYCKOFF", "WEIDNER", "WOZNIAK",
-            "WEILAND", "WILFONG", "WIEGAND", "WILCHER", "WIELAND", "WILDMAN", "WALDMAN",
-            "WORTMAN", "WYSOCKI", "WEIDMAN", "WITTMAN", "WIDENER", "WOLFSON", "WENDELL",
-            "WEITZEL", "WILLMAN", "WALDRUP", "WALTMAN", "WALCZAK", "WEIGAND", "WESSELS",
-            "WIDEMAN", "WOLTERS", "WIREMAN", "WILHOIT", "WEGENER", "WOTRING", "WINGERT",
-            "WIESNER", "WAYMIRE", "WHETZEL", "WENTZEL", "WINEGAR", "WESTMAN", "WYNKOOP",
-            "WALLICK", "WURSTER", "WINBUSH", "WILBERT", "WALLACH", "WEISSER", "WEISNER",
-            "WINDERS", "WILLMON", "WILLEMS", "WIERSMA", "WACHTEL", "WARNICK", "WEIDLER",
-            "WALTRIP", "WHETSEL", "WHELESS", "WELCHER", "WALBORN", "WILLSEY", "WEINMAN",
-            "WAGAMAN", "WOMMACK", "WINGLER", "WINKLES", "WIEDMAN", "WHITNER", "WOLFRAM",
-            "WARLICK", "WEEDMAN", "WHISMAN", "WINLAND", "WEESNER", "WARTHEN", "WETZLER",
-            "WENDLER", "WALLNER", "WOLBERT", "WITTMER", "WISHART", "WILLIAM", "WESTPHAL",
-            "WICKLUND", "WEISSMAN", "WESTLUND", "WOLFGANG", "WILLHITE", "WEISBERG", "WALRAVEN",
-            "WOLFGRAM", "WILHOITE", "WECHSLER", "WENDLING", "WESTBERG", "WENDLAND", "WININGER",
-            "WHISNANT", "WESTRICK", "WESTLING", "WESTBURY", "WEITZMAN", "WEHMEYER", "WEINMANN",
-            "WISNESKI", "WHELCHEL", "WEISHAAR", "WAGGENER", "WALDROUP", "WESTHOFF", "WIEDEMAN",
-            "WASINGER", "WINBORNE", "WHISENANT", "WEINSTEIN", "WESTERMAN", "WASSERMAN",
-            "WITKOWSKI", "WEINTRAUB", "WINKELMAN", "WINKFIELD", "WANAMAKER", "WIECZOREK",
-            "WIECHMANN", "WOJTOWICZ", "WALKOWIAK", "WEINSTOCK", "WILLEFORD", "WARKENTIN",
-            "WEISINGER", "WINKLEMAN", "WILHEMINA", "WISNIEWSKI", "WUNDERLICH", "WHISENHUNT",
-            "WEINBERGER", "WROBLEWSKI", "WAGUESPACK", "WEISGERBER", "WESTERVELT", "WESTERLUND",
-            "WASILEWSKI", "WILDERMUTH", "WESTENDORF", "WESOLOWSKI", "WEINGARTEN", "WINEBARGER",
-            "WESTERBERG", "WANNAMAKER", "WEISSINGER", "WALDSCHMIDT", "WEINGARTNER",
-            "WINEBRENNER", "WOLFENBARGER", "WOJCIECHOWSKI",
+            "WEE",
+            "WIX",
+            "WAX",
+            "WOLF",
+            "WEIS",
+            "WAHL",
+            "WALZ",
+            "WEIL",
+            "WERT",
+            "WINE",
+            "WILK",
+            "WALT",
+            "WOLL",
+            "WADA",
+            "WULF",
+            "WEHR",
+            "WURM",
+            "WYSE",
+            "WENZ",
+            "WIRT",
+            "WOLK",
+            "WEIN",
+            "WYSS",
+            "WASS",
+            "WANN",
+            "WINT",
+            "WINK",
+            "WILE",
+            "WIKE",
+            "WIER",
+            "WELK",
+            "WISE",
+            "WIRTH",
+            "WIESE",
+            "WITTE",
+            "WENTZ",
+            "WOLFF",
+            "WENDT",
+            "WERTZ",
+            "WILKE",
+            "WALTZ",
+            "WEISE",
+            "WOOLF",
+            "WERTH",
+            "WEESE",
+            "WURTH",
+            "WINES",
+            "WARGO",
+            "WIMER",
+            "WISER",
+            "WAGER",
+            "WILLE",
+            "WILDS",
+            "WAGAR",
+            "WERTS",
+            "WITTY",
+            "WIENS",
+            "WIEBE",
+            "WIRTZ",
+            "WYMER",
+            "WULFF",
+            "WIBLE",
+            "WINER",
+            "WIEST",
+            "WALKO",
+            "WALLA",
+            "WEBRE",
+            "WEYER",
+            "WYBLE",
+            "WOMAC",
+            "WILTZ",
+            "WURST",
+            "WOLAK",
+            "WELKE",
+            "WEDEL",
+            "WEIST",
+            "WYGAN",
+            "WUEST",
+            "WEISZ",
+            "WALCK",
+            "WEITZ",
+            "WYDRA",
+            "WANDA",
+            "WILMA",
+            "WEBER",
+            "WETZEL",
+            "WEINER",
+            "WENZEL",
+            "WESTER",
+            "WALLEN",
+            "WENGER",
+            "WALLIN",
+            "WEILER",
+            "WIMMER",
+            "WEIMER",
+            "WYRICK",
+            "WEGNER",
+            "WINNER",
+            "WESSEL",
+            "WILKIE",
+            "WEIGEL",
+            "WOJCIK",
+            "WENDEL",
+            "WITTER",
+            "WIENER",
+            "WEISER",
+            "WEXLER",
+            "WACKER",
+            "WISNER",
+            "WITMER",
+            "WINKLE",
+            "WELTER",
+            "WIDMER",
+            "WITTEN",
+            "WINDLE",
+            "WASHER",
+            "WOLTER",
+            "WILKEY",
+            "WIDNER",
+            "WARMAN",
+            "WEYANT",
+            "WEIBEL",
+            "WANNER",
+            "WILKEN",
+            "WILTSE",
+            "WARNKE",
+            "WALSER",
+            "WEIKEL",
+            "WESNER",
+            "WITZEL",
+            "WROBEL",
+            "WAGNON",
+            "WINANS",
+            "WENNER",
+            "WOLKEN",
+            "WILNER",
+            "WYSONG",
+            "WYCOFF",
+            "WUNDER",
+            "WINKEL",
+            "WIDMAN",
+            "WELSCH",
+            "WEHNER",
+            "WEIGLE",
+            "WETTER",
+            "WUNSCH",
+            "WHITTY",
+            "WAXMAN",
+            "WILKER",
+            "WILHAM",
+            "WITTIG",
+            "WITMAN",
+            "WESTRA",
+            "WEHRLE",
+            "WASSER",
+            "WILLER",
+            "WEGMAN",
+            "WARFEL",
+            "WYNTER",
+            "WERNER",
+            "WAGNER",
+            "WISSER",
+            "WISEMAN",
+            "WINKLER",
+            "WILHELM",
+            "WELLMAN",
+            "WAMPLER",
+            "WACHTER",
+            "WALTHER",
+            "WYCKOFF",
+            "WEIDNER",
+            "WOZNIAK",
+            "WEILAND",
+            "WILFONG",
+            "WIEGAND",
+            "WILCHER",
+            "WIELAND",
+            "WILDMAN",
+            "WALDMAN",
+            "WORTMAN",
+            "WYSOCKI",
+            "WEIDMAN",
+            "WITTMAN",
+            "WIDENER",
+            "WOLFSON",
+            "WENDELL",
+            "WEITZEL",
+            "WILLMAN",
+            "WALDRUP",
+            "WALTMAN",
+            "WALCZAK",
+            "WEIGAND",
+            "WESSELS",
+            "WIDEMAN",
+            "WOLTERS",
+            "WIREMAN",
+            "WILHOIT",
+            "WEGENER",
+            "WOTRING",
+            "WINGERT",
+            "WIESNER",
+            "WAYMIRE",
+            "WHETZEL",
+            "WENTZEL",
+            "WINEGAR",
+            "WESTMAN",
+            "WYNKOOP",
+            "WALLICK",
+            "WURSTER",
+            "WINBUSH",
+            "WILBERT",
+            "WALLACH",
+            "WEISSER",
+            "WEISNER",
+            "WINDERS",
+            "WILLMON",
+            "WILLEMS",
+            "WIERSMA",
+            "WACHTEL",
+            "WARNICK",
+            "WEIDLER",
+            "WALTRIP",
+            "WHETSEL",
+            "WHELESS",
+            "WELCHER",
+            "WALBORN",
+            "WILLSEY",
+            "WEINMAN",
+            "WAGAMAN",
+            "WOMMACK",
+            "WINGLER",
+            "WINKLES",
+            "WIEDMAN",
+            "WHITNER",
+            "WOLFRAM",
+            "WARLICK",
+            "WEEDMAN",
+            "WHISMAN",
+            "WINLAND",
+            "WEESNER",
+            "WARTHEN",
+            "WETZLER",
+            "WENDLER",
+            "WALLNER",
+            "WOLBERT",
+            "WITTMER",
+            "WISHART",
+            "WILLIAM",
+            "WESTPHAL",
+            "WICKLUND",
+            "WEISSMAN",
+            "WESTLUND",
+            "WOLFGANG",
+            "WILLHITE",
+            "WEISBERG",
+            "WALRAVEN",
+            "WOLFGRAM",
+            "WILHOITE",
+            "WECHSLER",
+            "WENDLING",
+            "WESTBERG",
+            "WENDLAND",
+            "WININGER",
+            "WHISNANT",
+            "WESTRICK",
+            "WESTLING",
+            "WESTBURY",
+            "WEITZMAN",
+            "WEHMEYER",
+            "WEINMANN",
+            "WISNESKI",
+            "WHELCHEL",
+            "WEISHAAR",
+            "WAGGENER",
+            "WALDROUP",
+            "WESTHOFF",
+            "WIEDEMAN",
+            "WASINGER",
+            "WINBORNE",
+            "WHISENANT",
+            "WEINSTEIN",
+            "WESTERMAN",
+            "WASSERMAN",
+            "WITKOWSKI",
+            "WEINTRAUB",
+            "WINKELMAN",
+            "WINKFIELD",
+            "WANAMAKER",
+            "WIECZOREK",
+            "WIECHMANN",
+            "WOJTOWICZ",
+            "WALKOWIAK",
+            "WEINSTOCK",
+            "WILLEFORD",
+            "WARKENTIN",
+            "WEISINGER",
+            "WINKLEMAN",
+            "WILHEMINA",
+            "WISNIEWSKI",
+            "WUNDERLICH",
+            "WHISENHUNT",
+            "WEINBERGER",
+            "WROBLEWSKI",
+            "WAGUESPACK",
+            "WEISGERBER",
+            "WESTERVELT",
+            "WESTERLUND",
+            "WASILEWSKI",
+            "WILDERMUTH",
+            "WESTENDORF",
+            "WESOLOWSKI",
+            "WEINGARTEN",
+            "WINEBARGER",
+            "WESTERBERG",
+            "WANNAMAKER",
+            "WEISSINGER",
+            "WALDSCHMIDT",
+            "WEINGARTNER",
+            "WINEBRENNER",
+            "WOLFENBARGER",
+            "WOJCIECHOWSKI",
         ])
     }
 
@@ -3685,8 +4463,7 @@ impl Metaphone3 {
     //Encode cases where americans recognize "-EZ" as part of a french word where Z
     //not pronounced
     fn encode_french_ez(&mut self) -> bool {
-        if (self.idx == 3 && self.string_at(-3, &["CHEZ"])) || self.string_at(-5, &["RENDEZ"])
-        {
+        if (self.idx == 3 && self.string_at(-3, &["CHEZ"])) || self.string_at(-5, &["RENDEZ"]) {
             return true;
         }
 
@@ -3754,12 +4531,20 @@ impl Metaphone3 {
 
     fn encode_skip_silent_ue(&mut self) -> bool {
         // always silent except for cases listed below
-        if (self.string_at(-1, &["QUE", "GUE"]) &&
-            !self.string_start(&["RISQUE", "PIROGUE", "ENRIQUE", "BARBEQUE", "PALENQUE", "APPLIQUE", "COMMUNIQUE"]) &&
-            !self.string_at(-3, &["ARGUE", "SEGUE"])) &&
-            self.idx > 1 &&
-            ((self.idx + 1 == self.last_idx) || self.string_start(&["JACQUES"])) {
-
+        if (self.string_at(-1, &["QUE", "GUE"])
+            && !self.string_start(&[
+                "RISQUE",
+                "PIROGUE",
+                "ENRIQUE",
+                "BARBEQUE",
+                "PALENQUE",
+                "APPLIQUE",
+                "COMMUNIQUE",
+            ])
+            && !self.string_at(-3, &["ARGUE", "SEGUE"]))
+            && self.idx > 1
+            && ((self.idx + 1 == self.last_idx) || self.string_start(&["JACQUES"]))
+        {
             self.idx = self.skip_vowels(self.idx);
             return true;
         }
@@ -3772,9 +4557,9 @@ impl Metaphone3 {
     fn encode_e_pronounced(&mut self) {
         // special cases with two pronunciations
         // 'agape' 'lame' 'resume'
-        if self.string_exact(&["LAME", "SAKE", "PATE", "AGAPE"]) ||
-            (self.string_start(&["RESUME"]) && self.idx == 5) {
-
+        if self.string_exact(&["LAME", "SAKE", "PATE", "AGAPE"])
+            || (self.string_start(&["RESUME"]) && self.idx == 5)
+        {
             self.metaph_add_alt('\0', 'A');
             return;
         }
@@ -3795,9 +4580,9 @@ impl Metaphone3 {
         }
 
         // encode all vowels and diphthongs to the same value
-        if (!self.encode_e_silent() && !self.flag_al_inversion && !self.encode_silent_internal_e()) ||
-            self.encode_e_pronounced_exceptions() {
-
+        if (!self.encode_e_silent() && !self.flag_al_inversion && !self.encode_silent_internal_e())
+            || self.encode_e_pronounced_exceptions()
+        {
             self.metaph_add('A');
         }
 
@@ -3836,8 +4621,8 @@ impl Metaphone3 {
                         "MOHAMED", "MOHAMMED", "MUHAMMED", "MOUHAMED", "ANTIPODES", "ANOPHELES"]))) ||
             // e.g.  'wholeness', 'boneless', 'barely'
             self.string_at_end(1, &["NESS", "LESS"]) ||
-            (self.string_at_end(1, &["LY"]) && !self.string_start(&["CICELY"])) {
-
+            (self.string_at_end(1, &["LY"]) && !self.string_start(&["CICELY"]))
+        {
             return true;
         }
         false
@@ -3854,8 +4639,8 @@ impl Metaphone3 {
     // Trafalz, and VictorLaszlo, all of them atriots from the Eschaton,
     // for all their fine contributions!
     fn encode_e_pronounced_at_end(&mut self) -> bool {
-        if self.idx == self.last_idx &&
-            (self.string_at(-6, &["STROPHE"]) ||
+        if self.idx == self.last_idx
+            && (self.string_at(-6, &["STROPHE"]) ||
                 // if a vowel is before the 'E', vowel eater will have eaten it.
                 //otherwise, consonant + 'E' will need 'E' pronounced
                 self.in_buf.len() == 2 ||
@@ -3878,8 +4663,8 @@ impl Metaphone3 {
                     "PENELOPE", "CALLIOPE", "CHIPOTLE", "ANTIGONE", "KAMIKAZE", "EURIDICE",
                     "YOSEMITE", "FERRANTE",
                     "HYPERBOLE", "GUACAMOLE", "XANTHIPPE",
-                    "SYNECDOCHE"])) {
-
+                    "SYNECDOCHE"]))
+        {
             return true;
         }
 
@@ -3888,17 +4673,19 @@ impl Metaphone3 {
 
     fn encode_silent_internal_e(&mut self) -> bool {
         // 'olesen' but not 'olen'	RAKE BLAKE
-        if (self.string_start(&["OLE"]) && self.encode_e_suffix(3)) ||
-            (self.string_start(&["BARE", "FIRE", "FORE", "GATE", "HAGE", "HAVE",
-                "HAZE", "HOLE", "CAPE", "HUSE", "LACE", "LINE",
-                "LIVE", "LOVE", "MORE", "MOSE", "MORE", "NICE",
-                "RAKE", "ROBE", "ROSE", "SISE", "SIZE", "WARE",
-                "WAKE", "WISE", "WINE"]) && self.encode_e_suffix(4)) ||
-            (self.string_start(&["BLAKE", "BRAKE", "BRINE", "CARLE", "CLEVE", "DUNNE",
-                "HEDGE", "HOUSE", "JEFFE", "LUNCE", "STOKE", "STONE",
-                "THORE", "WEDGE", "WHITE"]) && self.encode_e_suffix(5)) ||
-            (self.string_start(&["BRIDGE", "CHEESE"]) && self.encode_e_suffix(6)) ||
-            (self.string_at(-5, &["CHARLES"])) {
+        if (self.string_start(&["OLE"]) && self.encode_e_suffix(3))
+            || (self.string_start(&[
+                "BARE", "FIRE", "FORE", "GATE", "HAGE", "HAVE", "HAZE", "HOLE", "CAPE", "HUSE",
+                "LACE", "LINE", "LIVE", "LOVE", "MORE", "MOSE", "MORE", "NICE", "RAKE", "ROBE",
+                "ROSE", "SISE", "SIZE", "WARE", "WAKE", "WISE", "WINE",
+            ]) && self.encode_e_suffix(4))
+            || (self.string_start(&[
+                "BLAKE", "BRAKE", "BRINE", "CARLE", "CLEVE", "DUNNE", "HEDGE", "HOUSE", "JEFFE",
+                "LUNCE", "STOKE", "STONE", "THORE", "WEDGE", "WHITE",
+            ]) && self.encode_e_suffix(5))
+            || (self.string_start(&["BRIDGE", "CHEESE"]) && self.encode_e_suffix(6))
+            || (self.string_at(-5, &["CHARLES"]))
+        {
             return true;
         }
 
@@ -3908,10 +4695,12 @@ impl Metaphone3 {
     fn encode_e_suffix(&mut self, at: usize) -> bool {
         //E_Silent_Suffix && !E_Pronouncing_Suffix
 
-        if self.idx == at - 1 && self.in_buf.len() > at + 1 &&
-            (self.is_vowel_at(-((self.idx as isize) - (at as isize) - 1)) ||
-                (self.string_at(-((self.idx as isize) - (at as isize)), &["ST", "SL"]) && self.in_buf.len() > at + 2)) {
-
+        if self.idx == at - 1
+            && self.in_buf.len() > at + 1
+            && (self.is_vowel_at(-((self.idx as isize) - (at as isize) - 1))
+                || (self.string_at(-((self.idx as isize) - (at as isize)), &["ST", "SL"])
+                    && self.in_buf.len() > at + 2))
+        {
             // now filter endings that will cause the 'e' to be pronounced
 
             // e.g. 'bridgewood' - the other vowels will get eaten
@@ -3919,9 +4708,13 @@ impl Metaphone3 {
             // e.g. 'bridgette'
             // e.g. 'olena'
             // e.g. 'bridget'
-            if self.string_at_end(-((self.idx as isize) - (at as isize)), &["T", "R", "TA", "TT", "NA", "NO", "NE",
-                "RS", "RE", "LA", "AU", "RO", "RA", "TTE", "LIA", "NOW", "ROS", "RAS",
-                "WOOD", "WATER", "WORTH"]) {
+            if self.string_at_end(
+                -((self.idx as isize) - (at as isize)),
+                &[
+                    "T", "R", "TA", "TT", "NA", "NO", "NE", "RS", "RE", "LA", "AU", "RO", "RA",
+                    "TTE", "LIA", "NOW", "ROS", "RAS", "WOOD", "WATER", "WORTH",
+                ],
+            ) {
                 return false;
             }
 
@@ -3937,29 +4730,102 @@ impl Metaphone3 {
     // and the vowel needs to be encoded here
     fn encode_e_pronounced_exceptions(&mut self) -> bool {
         // greek names e.g. "herakles" or hispanic names e.g. "robles", where 'e' is pronounced, other exceptions
-        if (self.idx + 1 == self.last_idx &&
-            (self.string_at_end(-3, &["OCLES", "ACLES", "AKLES"]) ||
-                self.string_start(&["INES",
-                    "LOPES", "ESTES", "GOMES", "NUNES", "ALVES", "ICKES",
-                    "INNES", "PERES", "WAGES", "NEVES", "BENES", "DONES",
-                    "CORTES", "CHAVES", "VALDES", "ROBLES", "TORRES", "FLORES", "BORGES",
-                    "NIEVES", "MONTES", "SOARES", "VALLES", "GEDDES", "ANDRES", "VIAJES",
-                    "CALLES", "FONTES", "HERMES", "ACEVES", "BATRES", "MATHES",
-                    "DELORES", "MORALES", "DOLORES", "ANGELES", "ROSALES", "MIRELES", "LINARES",
-                    "PERALES", "PAREDES", "BRIONES", "SANCHES", "CAZARES", "REVELES", "ESTEVES",
-                    "ALVARES", "MATTHES", "SOLARES", "CASARES", "CACERES", "STURGES", "RAMIRES",
-                    "FUNCHES", "BENITES", "FUENTES", "PUENTES", "TABARES", "HENTGES", "VALORES",
-                    "GONZALES", "MERCEDES", "FAGUNDES", "JOHANNES", "GONSALES", "BERMUDES",
-                    "CESPEDES", "BETANCES", "TERRONES", "DIOGENES", "CORRALES", "CABRALES",
-                    "MARTINES", "GRAJALES",
-                    "CERVANTES", "FERNANDES", "GONCALVES", "BENEVIDES", "CIFUENTES", "SIFUENTES",
-                    "SERVANTES", "HERNANDES", "BENAVIDES",
-                    "ARCHIMEDES", "CARRIZALES", "MAGALLANES"]))) ||
-            self.string_at(-2, &["FRED", "DGES", "DRED", "GNES"]) ||
-            self.string_at(-5, &["PROBLEM", "RESPLEN"]) ||
-            self.string_at(-4, &["REPLEN"]) ||
-            self.string_at(-3, &["SPLE"]) {
-
+        if (self.idx + 1 == self.last_idx
+            && (self.string_at_end(-3, &["OCLES", "ACLES", "AKLES"])
+                || self.string_start(&[
+                    "INES",
+                    "LOPES",
+                    "ESTES",
+                    "GOMES",
+                    "NUNES",
+                    "ALVES",
+                    "ICKES",
+                    "INNES",
+                    "PERES",
+                    "WAGES",
+                    "NEVES",
+                    "BENES",
+                    "DONES",
+                    "CORTES",
+                    "CHAVES",
+                    "VALDES",
+                    "ROBLES",
+                    "TORRES",
+                    "FLORES",
+                    "BORGES",
+                    "NIEVES",
+                    "MONTES",
+                    "SOARES",
+                    "VALLES",
+                    "GEDDES",
+                    "ANDRES",
+                    "VIAJES",
+                    "CALLES",
+                    "FONTES",
+                    "HERMES",
+                    "ACEVES",
+                    "BATRES",
+                    "MATHES",
+                    "DELORES",
+                    "MORALES",
+                    "DOLORES",
+                    "ANGELES",
+                    "ROSALES",
+                    "MIRELES",
+                    "LINARES",
+                    "PERALES",
+                    "PAREDES",
+                    "BRIONES",
+                    "SANCHES",
+                    "CAZARES",
+                    "REVELES",
+                    "ESTEVES",
+                    "ALVARES",
+                    "MATTHES",
+                    "SOLARES",
+                    "CASARES",
+                    "CACERES",
+                    "STURGES",
+                    "RAMIRES",
+                    "FUNCHES",
+                    "BENITES",
+                    "FUENTES",
+                    "PUENTES",
+                    "TABARES",
+                    "HENTGES",
+                    "VALORES",
+                    "GONZALES",
+                    "MERCEDES",
+                    "FAGUNDES",
+                    "JOHANNES",
+                    "GONSALES",
+                    "BERMUDES",
+                    "CESPEDES",
+                    "BETANCES",
+                    "TERRONES",
+                    "DIOGENES",
+                    "CORRALES",
+                    "CABRALES",
+                    "MARTINES",
+                    "GRAJALES",
+                    "CERVANTES",
+                    "FERNANDES",
+                    "GONCALVES",
+                    "BENEVIDES",
+                    "CIFUENTES",
+                    "SIFUENTES",
+                    "SERVANTES",
+                    "HERNANDES",
+                    "BENAVIDES",
+                    "ARCHIMEDES",
+                    "CARRIZALES",
+                    "MAGALLANES",
+                ])))
+            || self.string_at(-2, &["FRED", "DGES", "DRED", "GNES"])
+            || self.string_at(-5, &["PROBLEM", "RESPLEN"])
+            || self.string_at(-4, &["REPLEN"])
+            || self.string_at(-3, &["SPLE"])
+        {
             return true;
         }
 
@@ -4149,12 +5015,20 @@ impl Metaphone3 {
     /// Adds different encoding characters to primary and secondary buffers
     fn metaph_add_alt(&mut self, prim: char, second: char) {
         // Add to primary buffer if not null (don't duplicate A's)
-        if prim != '\0' && !(prim == 'A' && !self.prim_buf.is_empty() && self.prim_buf[self.prim_buf.len() - 1] == 'A') {
+        if prim != '\0'
+            && !(prim == 'A'
+                && !self.prim_buf.is_empty()
+                && self.prim_buf[self.prim_buf.len() - 1] == 'A')
+        {
             self.prim_buf.push(prim);
         }
 
         // Add to secondary buffer if not null (don't duplicate A's)
-        if second != '\0' && !(second == 'A' && !self.second_buf.is_empty() && self.second_buf[self.second_buf.len() - 1] == 'A') {
+        if second != '\0'
+            && !(second == 'A'
+                && !self.second_buf.is_empty()
+                && self.second_buf[self.second_buf.len() - 1] == 'A')
+        {
             self.second_buf.push(second);
         }
     }
@@ -4162,14 +5036,21 @@ impl Metaphone3 {
     /// Adds strings to both buffers
     fn metaph_add_str(&mut self, prim: &str, second: &str) {
         // Add primary string (don't duplicate A's)
-        if !(prim == "A" && !self.prim_buf.is_empty() && self.prim_buf[self.prim_buf.len() - 1] == 'A') {
+        if !(prim == "A"
+            && !self.prim_buf.is_empty()
+            && self.prim_buf[self.prim_buf.len() - 1] == 'A')
+        {
             for c in prim.chars() {
                 self.prim_buf.push(c);
             }
         }
 
         // Add secondary string (don't duplicate A's)
-        if !second.is_empty() && !(second == "A" && !self.second_buf.is_empty() && self.second_buf[self.second_buf.len() - 1] == 'A') {
+        if !second.is_empty()
+            && !(second == "A"
+                && !self.second_buf.is_empty()
+                && self.second_buf[self.second_buf.len() - 1] == 'A')
+        {
             for c in second.chars() {
                 self.second_buf.push(c);
             }
@@ -4216,19 +5097,29 @@ impl Metaphone3 {
             let off = pos as isize - self.idx as isize;
 
             // Check for Polish/Slavic endings
-            if self.string_at(off, &["WICZ", "WITZ", "WIAK"]) ||
-               self.string_at(off - 1, &["EWSKI", "EWSKY", "OWSKI", "OWSKY"]) ||
-               self.string_at_end(off, &["WICKI", "WACKI"]) {
+            if self.string_at(off, &["WICZ", "WITZ", "WIAK"])
+                || self.string_at(off - 1, &["EWSKI", "EWSKY", "OWSKI", "OWSKY"])
+                || self.string_at_end(off, &["WICKI", "WACKI"])
+            {
                 break;
             }
 
             pos += 1;
 
             // Check for WH combinations
-            if pos >= 2 && self.in_buf[pos - 1] == 'W' && pos < self.length && self.in_buf[pos] == 'H' {
+            if pos >= 2
+                && self.in_buf[pos - 1] == 'W'
+                && pos < self.length
+                && self.in_buf[pos] == 'H'
+            {
                 let off2 = pos as isize - self.idx as isize;
-                if !self.string_at(off2, &["HOP", "HIDE", "HARD", "HEAD", "HAWK", "HERD", "HOOK", "HAND", "HOLE",
-                                           "HEART", "HOUSE", "HOUND", "HAMMER"]) {
+                if !self.string_at(
+                    off2,
+                    &[
+                        "HOP", "HIDE", "HARD", "HEAD", "HAWK", "HERD", "HOOK", "HAND", "HOLE",
+                        "HEART", "HOUSE", "HOUND", "HAMMER",
+                    ],
+                ) {
                     pos += 1;
                 }
             }
@@ -4240,11 +5131,7 @@ impl Metaphone3 {
             c = self.in_buf[pos];
         }
 
-        if pos > 0 {
-            pos - 1
-        } else {
-            0
-        }
+        if pos > 0 { pos - 1 } else { 0 }
     }
 
     /// Advances the counter conditionally based on the `encode_vowels` setting
