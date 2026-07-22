@@ -1,4 +1,42 @@
-// metaphone3.rs - Rust port of Metaphone3 algorithm
+//! A pure-Rust implementation of the **Metaphone 3** phonetic encoding algorithm.
+//!
+//! Metaphone 3 maps words that sound alike in American English onto the same
+//! keys, which makes it useful for fuzzy matching, name search, and phonetic
+//! comparison. Each word encodes to a *primary* key and, when the pronunciation
+//! is ambiguous, a *secondary* (alternate) key. Both keys are at most 8
+//! characters long.
+//!
+//! # Example
+//!
+//! ```
+//! use metaphone3::Metaphone3;
+//!
+//! let mut encoder = Metaphone3::new();
+//! let (primary, secondary) = encoder.encode("Smith");
+//! assert_eq!(primary, "SM0");
+//! assert_eq!(secondary, "XMT");
+//! ```
+//!
+//! The encoder is reusable across calls to minimize allocations, and supports
+//! optional [vowel](Metaphone3::with_encode_vowels) and
+//! [exact](Metaphone3::with_encode_exact) encoding modes via a builder-style API.
+//!
+//! [`Metaphone3`] is **not** thread-safe; use one encoder per thread.
+
+// Rust port of the Metaphone3 algorithm.
+#![warn(clippy::pedantic)]
+// These pedantic lints are intentionally allowed: the algorithm is a faithful
+// port whose index arithmetic relies on `usize`/`isize` casts that are correct
+// by construction (indices stay within short words), and whose boolean
+// conditionals and short binding names deliberately mirror the reference
+// implementation for auditability.
+#![allow(
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::similar_names,
+    clippy::nonminimal_bool,
+    clippy::if_not_else
+)]
 
 #[cfg(test)]
 mod tests;
@@ -8,6 +46,12 @@ const METAPH_MAX_LENGTH: usize = 8;
 use smartstring::alias::CompactString as String;
 
 /// A Metaphone 3 encoder.
+///
+/// Construct one with [`Metaphone3::new`], optionally configure it with
+/// [`with_encode_vowels`](Metaphone3::with_encode_vowels) /
+/// [`with_encode_exact`](Metaphone3::with_encode_exact), then call
+/// [`encode`](Metaphone3::encode). A single instance can encode many words and
+/// reuses its internal buffers between calls.
 pub struct Metaphone3 {
     in_buf: Vec<char>,
     length: usize,
@@ -22,6 +66,7 @@ pub struct Metaphone3 {
 
 impl Metaphone3 {
     /// Creates a new Metaphone3 encoder with default settings.
+    #[must_use]
     pub fn new() -> Self {
         Metaphone3 {
             in_buf: Vec::new(),
@@ -37,18 +82,35 @@ impl Metaphone3 {
     }
 
     /// Sets the option to encode vowels.
+    #[must_use]
     pub fn with_encode_vowels(mut self, encode: bool) -> Self {
         self.encode_vowels = encode;
         self
     }
 
     /// Sets the option for more exact encoding.
+    #[must_use]
     pub fn with_encode_exact(mut self, encode: bool) -> Self {
         self.encode_exact = encode;
         self
     }
 
     /// Encodes a word into its primary and secondary Metaphone 3 keys.
+    ///
+    /// Returns a `(primary, secondary)` tuple. The primary key is always present
+    /// for non-empty input; the secondary key is empty when the word has no
+    /// alternate pronunciation. Both keys are at most 8 characters long. Empty
+    /// input yields two empty strings.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use metaphone3::Metaphone3;
+    /// let mut encoder = Metaphone3::new();
+    /// let (primary, secondary) = encoder.encode("Aachen");
+    /// assert_eq!(primary, "AKN");
+    /// assert_eq!(secondary, "AXN");
+    /// ```
     pub fn encode(&mut self, word: &str) -> (String, String) {
         if word.is_empty() {
             return (String::new(), String::new());
@@ -189,13 +251,11 @@ impl Metaphone3 {
         //name sent in 'mac caffrey', 'mac gregor
         if self.string_at(1, &[" C", " Q", " G"]) {
             self.idx += 1;
-        } else {
-            if self.string_at(1, &["C", "K", "Q"]) && !self.string_at(1, &["CE", "CI"]) {
-                self.idx += 1; // increment 1 here, so adjust offsets below
-                // account for combinations such as Ro-ckc-liffe
-                if self.string_at(1, &["C", "K", "Q"]) && !self.string_at(2, &["CE", "CI"]) {
-                    self.idx += 1;
-                }
+        } else if self.string_at(1, &["C", "K", "Q"]) && !self.string_at(1, &["CE", "CI"]) {
+            self.idx += 1; // increment 1 here, so adjust offsets below
+            // account for combinations such as Ro-ckc-liffe
+            if self.string_at(1, &["C", "K", "Q"]) && !self.string_at(2, &["CE", "CI"]) {
+                self.idx += 1;
             }
         }
     }
@@ -381,7 +441,7 @@ impl Metaphone3 {
                 && (!self.char_at(2, 'E')
                     || self.string_at(-2, &["BACHER", "MACHER", "MACHEN", "LACHER"])))
             || // e.g. 'brecht', 'fuchs'
-            (self.string_at(2, &["T", "S"]) && !(self.string_start(&["LUNCHTIME", "WHICHSOEVER"])))
+            (self.string_at(2, &["T", "S"]) && !self.string_start(&["LUNCHTIME", "WHICHSOEVER"]))
             || // e.g. 'andromache'
             self.string_start(&["SCHR"])
             || (self.idx > 2 && self.string_at(-2, &["MACHE"]))
@@ -484,7 +544,7 @@ impl Metaphone3 {
             || // "chaos" => K but not "chao"
             (self.string_at(0, &["CHAO"]) && self.idx + 3 != self.last_idx)
             || // e.g. "abranchiate"
-            (self.string_at(0, &["CHIA"]) && !(self.string_start(&["CHIAPAS", "APPALACHIA"])))
+            (self.string_at(0, &["CHIA"]) && !self.string_start(&["CHIAPAS", "APPALACHIA"]))
             || // e.g. "chimera"
             self.string_at(0, &["CHIMERA", "CHIMAER", "CHIMERI"])
             || // e.g. "chameleon"
@@ -4116,7 +4176,7 @@ impl Metaphone3 {
         }
     }
 
-    /// Adds exact or approximate encoding based on encode_exact setting
+    /// Adds exact or approximate encoding based on the `encode_exact` setting
     fn metaph_add_exact_approx(&mut self, exact: char, approx: char) {
         if self.encode_exact {
             self.metaph_add(exact);
@@ -4125,7 +4185,7 @@ impl Metaphone3 {
         }
     }
 
-    /// String version of metaph_add_exact_approx
+    /// String version of `metaph_add_exact_approx`
     fn metaph_add_exact_approx_str(&mut self, exact: &str, approx: &str) {
         if self.encode_exact {
             self.metaph_add_str(exact, exact);
@@ -4187,7 +4247,7 @@ impl Metaphone3 {
         }
     }
 
-    /// Advances the counter conditionally based on encode_vowels setting
+    /// Advances the counter conditionally based on the `encode_vowels` setting
     fn advance_counter(&mut self, no_encode_vowel: usize, encode_vowel: usize) {
         if self.encode_vowels {
             self.idx += encode_vowel;

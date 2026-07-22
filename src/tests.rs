@@ -19,13 +19,11 @@ fn test_basic_words() {
         let (primary, secondary) = encoder.encode(input);
         assert_eq!(
             primary, expected_primary,
-            "Primary mismatch for '{}': expected '{}', got '{}'",
-            input, expected_primary, primary
+            "Primary mismatch for '{input}': expected '{expected_primary}', got '{primary}'"
         );
         assert_eq!(
             secondary, expected_secondary,
-            "Secondary mismatch for '{}': expected '{}', got '{}'",
-            input, expected_secondary, secondary
+            "Secondary mismatch for '{input}': expected '{expected_secondary}', got '{secondary}'"
         );
     }
 }
@@ -34,11 +32,7 @@ fn test_basic_words() {
 fn test_harness() {
     let mut encoder = Metaphone3::new().with_encode_vowels(true);
     let (primary, _) = encoder.encode("supernode");
-    assert_eq!(
-        primary, "SAPARNAT",
-        "Expected 'SAPARNAT', got '{}'",
-        primary
-    );
+    assert_eq!(primary, "SAPARNAT", "Expected 'SAPARNAT', got '{primary}'");
 }
 
 #[test]
@@ -115,8 +109,8 @@ fn test_name_files() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let print_stat = |name: &str, err: i32, total: i32| {
-            let percent = (err as f64 / total as f64) * 100.0;
-            println!("Encoder {}, error percent: {:.2}%", name, percent);
+            let percent = (f64::from(err) / f64::from(total)) * 100.0;
+            println!("Encoder {name}, error percent: {percent:.2}%");
         };
 
         print_stat("Enc", enc_err, cnt);
@@ -124,12 +118,10 @@ fn test_name_files() -> Result<(), Box<dyn std::error::Error>> {
         print_stat("EncE", enc_e_err, cnt);
         print_stat("EncV", enc_v_err, cnt);
 
-        if enc_err + enc_ev_err + enc_e_err + enc_v_err > 0 {
-            panic!(
-                "Errors when processing {:?}: Enc={} EncEV={} EncE={} EncV={}",
-                path, enc_err, enc_ev_err, enc_e_err, enc_v_err
-            );
-        }
+        assert!(
+            enc_err + enc_ev_err + enc_e_err + enc_v_err == 0,
+            "Errors when processing {path:?}: Enc={enc_err} EncEV={enc_ev_err} EncE={enc_e_err} EncV={enc_v_err}"
+        );
     }
 
     Ok(())
@@ -148,15 +140,13 @@ fn check_encoding(
     let mut had_error = false;
     if primary != expected_primary {
         eprintln!(
-            "Error Encoding '{}' with {}: Primary want '{}', got '{}'",
-            input, name, expected_primary, primary
+            "Error Encoding '{input}' with {name}: Primary want '{expected_primary}', got '{primary}'"
         );
         had_error = true;
     }
     if secondary != expected_secondary {
         eprintln!(
-            "Error Encoding '{}' with {}: Secondary want '{}', got '{}'",
-            input, name, expected_secondary, secondary
+            "Error Encoding '{input}' with {name}: Secondary want '{expected_secondary}', got '{secondary}'"
         );
         had_error = true;
     }
