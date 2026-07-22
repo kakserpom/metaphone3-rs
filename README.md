@@ -19,7 +19,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-metaphone3 = "0.1"
+metaphone3 = "0.1.1"
 ```
 
 ## Usage
@@ -150,6 +150,32 @@ fn phonetic_match(encoder: &mut Metaphone3, word1: &str, word2: &str) -> bool {
 | Thompson | TMPSN | |
 | Aachen | AKN | AXN |
 | Wroclaw | RKL | |
+
+## Performance
+
+The encoder is optimized to run allocation-free on the hot path: candidate
+comparisons match directly against the input buffer (no per-comparison heap
+allocation), the input buffer's capacity is reused across `encode()` calls, and
+the ≤8-character output keys stay inline via `smartstring` instead of touching
+the heap.
+
+Benchmarked on the bundled US surname corpus (~88k words), single-threaded,
+reusing one encoder:
+
+| Version | Throughput | Latency |
+|---------|------------|---------|
+| **v0.1.1** | ~2.8 M words/s | ~357 ns/word |
+| v0.1.0 | ~0.35 M words/s | ~2893 ns/word |
+
+That's roughly an **8× speedup** with byte-identical output. Numbers are from an
+Apple Silicon laptop (`--release`, LTO enabled); your results will vary with
+hardware and input distribution.
+
+Reproduce with the included benchmark:
+
+```sh
+cargo run --release --example bench
+```
 
 ## Algorithm Background
 
