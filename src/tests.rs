@@ -59,7 +59,7 @@ fn test_name_files() -> Result<(), Box<dyn std::error::Error>> {
     for entry in std::fs::read_dir(testdata_dir)? {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map_or(true, |ext| ext != "test") {
+        if path.extension() != Some("test".as_ref()) {
             continue;
         }
 

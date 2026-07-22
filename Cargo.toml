@@ -10,3 +10,7 @@ repository = "https://github.com/kakserpom/metaphone3-rs"
 smartstring = "1.0.1"
 [dev-dependencies]
 csv = "1.4.0"
+
+[profile.release]
+lto = true
+codegen-units = 1

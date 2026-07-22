@@ -56,7 +56,10 @@ impl Metaphone3 {
 
         // Reset state
         self.flag_al_inversion = false;
-        self.in_buf = word.to_uppercase().chars().collect();
+        // Uppercase char-by-char, reusing the existing buffer's capacity to avoid
+        // allocating a temporary String plus a fresh Vec on every call.
+        self.in_buf.clear();
+        self.in_buf.extend(word.chars().flat_map(char::to_uppercase));
         self.length = self.in_buf.len();
         self.last_idx = self.length - 1;
 
@@ -348,7 +351,7 @@ impl Metaphone3 {
     fn encode_english_ch_to_k(&mut self) -> bool {
         //'ache', 'echo', alternate spelling of 'michael'
         if (self.idx == 1 && self.root_or_inflections("ACHE"))
-            || ((self.idx > 3 && self.idx > 0 && self.root_or_inflections_from(self.idx - 1, "ACHE"))
+            || ((self.idx > 3 && self.root_or_inflections_from(self.idx - 1, "ACHE"))
                 && self.string_start(&[
                     "EAR", "HEAD", "BACK", "HEART", "BELLY", "TOOTH",
                 ]))
@@ -1600,10 +1603,8 @@ impl Metaphone3 {
         }
 
         if self.idx == 0 {
-            if self.encode_german_j() {
-                return;
-            } else if self.encode_j_to_j() {
-                return;
+            if !self.encode_german_j() {
+                self.encode_j_to_j();
             }
         } else {
             if self.encode_spanish_j2() {
@@ -1796,10 +1797,11 @@ impl Metaphone3 {
     }
 
     fn encode_silent_k(&mut self) -> bool {
-        if self.idx == 0 && self.string_start(&["KN"]) {
-            if !self.string_at(2, &["ISH", "ESSET", "IEVEL"]) {
-                return true;
-            }
+        if self.idx == 0
+            && self.string_start(&["KN"])
+            && !self.string_at(2, &["ISH", "ESSET", "IEVEL"])
+        {
+            return true;
         }
 
         // e.g. "know", "knit", "knob"
@@ -1987,9 +1989,7 @@ impl Metaphone3 {
 
     fn encode_ll_as_vowel_cases(&mut self) -> bool {
         if self.char_next_is('L') {
-            if self.encode_ll_as_vowel_special_cases() {
-                return true;
-            } else if self.encode_ll_as_vowel() {
+            if self.encode_ll_as_vowel_special_cases() || self.encode_ll_as_vowel() {
                 return true;
             }
             self.idx += 1;
@@ -3747,11 +3747,12 @@ impl Metaphone3 {
 
     fn encode_o_silent(&mut self) -> bool {
         // if "iron" at beginning or end of word and not "irony"
-        if self.char_at(0, 'O') && self.string_at(-2, &["IRON"]) {
-            if (self.string_start(&["IRON"]) || self.string_at_end(-2, &["IRON"])) &&
-                !self.string_at(-2, &["IRONIC"]) {
-                return true;
-            }
+        if self.char_at(0, 'O')
+            && self.string_at(-2, &["IRON"])
+            && (self.string_start(&["IRON"]) || self.string_at_end(-2, &["IRON"]))
+            && !self.string_at(-2, &["IRONIC"])
+        {
+            return true;
         }
 
         false
@@ -3937,6 +3938,30 @@ impl Metaphone3 {
         matches!(c, 'A' | 'E' | 'I' | 'O' | 'U' | 'Y')
     }
 
+    /// Returns true if `buf` starts with the characters of `s` (allocation-free).
+    fn buf_starts_with(buf: &[char], s: &str) -> bool {
+        let mut i = 0;
+        for c in s.chars() {
+            match buf.get(i) {
+                Some(&b) if b == c => i += 1,
+                _ => return false,
+            }
+        }
+        true
+    }
+
+    /// Returns true if `buf` equals the characters of `s` exactly (allocation-free).
+    fn buf_eq_str(buf: &[char], s: &str) -> bool {
+        let mut chars = s.chars();
+        for &b in buf {
+            match chars.next() {
+                Some(c) if c == b => {}
+                _ => return false,
+            }
+        }
+        chars.next().is_none()
+    }
+
     /// Returns true if one of the given substrings is located at the
     /// relative offset (relative to current idx) given
     fn string_at(&self, offset: isize, vals: &[&str]) -> bool {
@@ -3960,9 +3985,8 @@ impl Metaphone3 {
                 return false;
             }
 
-            // Check each character
-            let val_chars: Vec<char> = val.chars().collect();
-            if self.in_buf[start..start + val_chars.len()] == val_chars[..] {
+            // Compare directly against the input buffer without allocating.
+            if Self::buf_starts_with(&self.in_buf[start..], val) {
                 return true;
             }
         }
@@ -3994,13 +4018,7 @@ impl Metaphone3 {
         let start = start as usize;
 
         for &val in vals {
-            let val_len = val.len();
-            if start + val_len != self.length {
-                continue;
-            }
-
-            let val_chars: Vec<char> = val.chars().collect();
-            if self.in_buf[start..] == val_chars[..] {
+            if Self::buf_eq_str(&self.in_buf[start..], val) {
                 return true;
             }
         }
@@ -4022,8 +4040,7 @@ impl Metaphone3 {
             }
 
             let start = self.length - val_len;
-            let val_chars: Vec<char> = val.chars().collect();
-            if self.in_buf[start..] == val_chars[..] {
+            if Self::buf_eq_str(&self.in_buf[start..], val) {
                 return true;
             }
         }
@@ -4037,8 +4054,7 @@ impl Metaphone3 {
                 continue;
             }
 
-            let val_chars: Vec<char> = val.chars().collect();
-            if self.in_buf[..] == val_chars[..] {
+            if Self::buf_eq_str(&self.in_buf, val) {
                 return true;
             }
         }
@@ -4047,15 +4063,14 @@ impl Metaphone3 {
 
     /// Check if string contains the given value anywhere
     fn string_contains(&self, val: &str) -> bool {
-        let val_chars: Vec<char> = val.chars().collect();
-        let val_len = val_chars.len();
+        let val_len = val.chars().count();
 
         if val_len > self.length {
             return false;
         }
 
         for i in 0..=(self.length - val_len) {
-            if self.in_buf[i..i + val_len] == val_chars[..] {
+            if Self::buf_starts_with(&self.in_buf[i..], val) {
                 return true;
             }
         }
@@ -4273,14 +4288,13 @@ impl Metaphone3 {
         // at this point our root and inWord match, so now we're just checking the endings
         // of the inWord starting at index "last"
 
-        if len_diff == 3 && in_word.len() >= 3 && &in_word[..3] == ['I', 'N', 'G'] {
+        if len_diff == 3 && in_word.len() >= 3 && in_word[..3] == ['I', 'N', 'G'] {
             // check ING
             return true;
-        } else if len_diff == 5 && in_word.len() >= 5 && &in_word[..5] == ['I', 'N', 'G', 'L', 'Y']
-        {
+        } else if len_diff == 5 && in_word.len() >= 5 && in_word[..5] == ['I', 'N', 'G', 'L', 'Y'] {
             // check INGLY
             return true;
-        } else if len_diff == 1 && in_word.len() >= 1 && in_word[0] == 'Y' {
+        } else if len_diff == 1 && !in_word.is_empty() && in_word[0] == 'Y' {
             // check Y
             return true;
         }
