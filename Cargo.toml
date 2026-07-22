@@ -1,10 +1,16 @@
 [package]
 name = "metaphone3"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT"
 description = "Metaphone3 phonetic algorithm"
 repository = "https://github.com/kakserpom/metaphone3-rs"
+readme = "README.md"
+keywords = ["metaphone", "phonetic", "soundex", "fuzzy", "matching"]
+categories = ["algorithms", "text-processing"]
+# The large testdata corpora (~16 MB) are only used by the local test harness
+# and would exceed crates.io's package size limit, so keep them out of the crate.
+exclude = ["testdata/", "**/.DS_Store"]
 
 [dependencies]
 smartstring = "1.0.1"
